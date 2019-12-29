@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿#define ENABLE_NETWORKING
+
+using UnityEngine;
 using System.Collections;
 
 namespace Completed
@@ -6,10 +8,13 @@ namespace Completed
 	public class Loader : MonoBehaviour 
 	{
 		public GameObject gameManager;			//GameManager prefab to instantiate.
-		public GameObject soundManager;			//SoundManager prefab to instantiate.
-		
-		
-		void Awake ()
+		public GameObject soundManager;         //SoundManager prefab to instantiate.
+
+#if ENABLE_NETWORKING
+        private NetworkManager networkManager = null;
+#endif
+
+        void Awake ()
 		{
 			//Check if a GameManager has already been assigned to static variable GameManager.instance or if it's still null
 			if (GameManager.instance == null)
@@ -22,6 +27,10 @@ namespace Completed
 				
 				//Instantiate SoundManager prefab
 				Instantiate(soundManager);
-		}
-	}
+
+#if ENABLE_NETWORKING
+            networkManager.Init();
+#endif
+        }
+    }
 }

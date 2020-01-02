@@ -23,33 +23,29 @@ namespace Completed
 
         void InitialisePanels()
         {
-            for (int playerIdx = 0; playerIdx < 4 /*GameManager.instance.numPlayers*/; playerIdx++)
+            for (int playerIdx = 0; playerIdx < GameManager.MaxNumPlayers; playerIdx++)
             {
-                // skip 0, spawned in scene
-                if (playerIdx > 0)
+                if (playerIdx >= NetworkManager.Instance.GetNumPeers())
                 {
-                    CreatePanel(playerIdx);
+                    SetPanelEnabled(playerIdx, false);
                 }
+                else
+                {
+                    SetPanelEnabled(playerIdx, true);
 
-                NetworkManager.Peer currentPeer = NetworkManager.Instance.GetPeer(playerIdx);
+                    NetworkManager.Peer currentPeer = NetworkManager.Instance.GetPeer(playerIdx);
+
+                    GameObject currentPanel = GameObject.Find("LobbyPlayerPanel" + (playerIdx + 1));
+                    UnityEngine.UI.Text currentPanelNameText = currentPanel.transform.Find("LobbyPlayerNameText").GetComponent<UnityEngine.UI.Text>();
+                    currentPanelNameText.text = "Name: " + currentPeer.playerName;
+                }
             }
         }
 
-        void CreatePanel(int index)
+        void SetPanelEnabled(int index, bool enabled)
         {
-            GameObject container = GameObject.Find("LobbyPlayerPanelContainer");
-            GameObject playerPanel = GameObject.Find("LobbyPlayerPanel");
-            GameObject newPanel = Instantiate(playerPanel, playerPanel.transform, true);
-
-            Vector3 position = newPanel.transform.position;
-            position.x += playerPanelSpacing * index;
-            newPanel.transform.position = position;
-            newPanel.name = "LobbyPlayerPanel" + index;
-            newPanel.transform.SetParent(container.transform);
-
-            Transform numPanelTextTransform = newPanel.transform.Find("LobbyPlayerNumText");
-            UnityEngine.UI.Text numPaneltext = numPanelTextTransform.GetComponent<UnityEngine.UI.Text>();
-            numPaneltext.text = "Player " + (index + 1);
+            GameObject playerPanel = GameObject.Find("LobbyPlayerPanel" + (index + 1));
+            playerPanel.SetActive(enabled);
         }
     }
 }

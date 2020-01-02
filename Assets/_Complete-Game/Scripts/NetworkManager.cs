@@ -49,8 +49,8 @@ namespace Completed
         private Socket clientSocket = null;
 
         // Peers
-        private int numPeers = 0;
-        private Peer[] peers;
+        private static int numPeers = 0;
+        private static Peer[] peers = null;
 
         public static NetworkManager Instance
         {
@@ -67,10 +67,13 @@ namespace Completed
 
         public NetworkManager()
         {
-            peers = new Peer[GameManager.MaxNumPlayers];
-            for (int peerIdx = 0; peerIdx < GameManager.MaxNumPlayers; ++peerIdx)
+            if (peers == null)
             {
-                peers[peerIdx] = new Peer();
+                peers = new Peer[GameManager.MaxNumPlayers];
+                for (int peerIdx = 0; peerIdx < GameManager.MaxNumPlayers; ++peerIdx)
+                {
+                    peers[peerIdx] = new Peer();
+                }
             }
         }
 
@@ -89,6 +92,11 @@ namespace Completed
         public bool IsActive()
         {
             return (netState == NetState.ActiveClient || netState == NetState.ActiveHost);
+        }
+
+        public int GetNumPeers()
+        {
+            return numPeers;
         }
 
         public void AddPeer(string playerName, bool isLocal, bool isHost)

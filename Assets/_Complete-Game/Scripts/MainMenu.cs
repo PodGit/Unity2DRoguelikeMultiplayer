@@ -5,49 +5,56 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Net;
 
-public class MainMenu : MonoBehaviour
+namespace Completed
 {
-    // Start is called before the first frame update
-    void Start()
+    public class MainMenu : MonoBehaviour
     {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
-    public void StartGameSolo()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
-    }
-
-    public void StartGameHost()
-    {
-        NetworkManager.Instance.Host();
-    }
-
-    public void StartGameJoin()
-    {
-        try
+        // Start is called before the first frame update
+        void Start()
         {
-            UnityEngine.UI.InputField inputField = GameObject.Find("MainMenuJoinIPInput").GetComponent<UnityEngine.UI.InputField>();
-            string ipAddress = inputField.text;
 
-            if (ipAddress.Length > 0)
-            {
-                NetworkManager.Instance.Join(ipAddress);
-            }
-            else
-            {
-                throw new System.ArgumentException("IpAddress field empty");
-            }
         }
-        catch (Exception e)
+
+        // Update is called once per frame
+        void Update()
         {
-            Debug.Log("Exception: " + e.ToString());
+
+        }
+
+        public void StartGameSolo()
+        {
+            SceneManager.LoadScene("GameScene");
+        }
+
+        public void StartGameHost()
+        {
+            UnityEngine.UI.Text playerNameText = GameObject.Find("MainMenuNameInputText").GetComponent<UnityEngine.UI.Text>();
+
+            NetworkManager.Instance.AddPeer(playerNameText.text, true, true);
+            NetworkManager.Instance.Host();
+            SceneManager.LoadScene("lobby");
+        }
+
+        public void StartGameJoin()
+        {
+            try
+            {
+                UnityEngine.UI.InputField inputField = GameObject.Find("MainMenuJoinIPInput").GetComponent<UnityEngine.UI.InputField>();
+                string ipAddress = inputField.text;
+
+                if (ipAddress.Length > 0)
+                {
+                    NetworkManager.Instance.Join(ipAddress);
+                }
+                else
+                {
+                    throw new System.ArgumentException("IpAddress field empty");
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.Log("Exception: " + e.ToString());
+            }
         }
     }
 }

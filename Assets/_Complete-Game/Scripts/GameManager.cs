@@ -70,10 +70,12 @@ namespace Completed
         //This is called each time a scene is loaded.
         static private void OnSceneLoaded(Scene arg0, LoadSceneMode arg1)
         {
-            instance.level++;
-            instance.InitGame();
+            if (arg0.name == "GameScene")
+            {
+                instance.level++;
+                instance.InitGame();
+            }
         }
-
 		
 		//Initializes the game for each level.
 		void InitGame()
@@ -103,6 +105,7 @@ namespace Completed
 			boardScript.SetupScene(level);
 
             playerFoodPoints = new int[MaxNumPlayers];
+
             for (int playerIdx = 0; playerIdx < MaxNumPlayers; ++playerIdx)
             {
                 playerFoodPoints[playerIdx] = startFoodPoints;

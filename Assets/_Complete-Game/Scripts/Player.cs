@@ -65,6 +65,7 @@ namespace Completed
 		{
             if (onExitTile)
             {
+                Debug.Assert(false, "awdawdaw");
                 //Invoke the Restart function to start the next level with a delay of restartLevelDelay (default 1 second).
                 Invoke("Restart", restartLevelDelay);
 

@@ -32,10 +32,23 @@ namespace Completed
 
         public class Peer
         {
-            public string playerName = "";
-            public int peerIdx = -1;
-            public bool local = false;
-            public bool host = false;
+            public Peer(string name, int index, bool isLocal, bool isHost)
+            {
+                this.name = name;
+                peerIdx = index;
+                local = isLocal;
+                host = isHost;
+            }
+
+            public string GetName()
+            {
+                return name;
+            }
+
+            string name = "";
+            int peerIdx = -1;
+            bool local = false;
+            bool host = false;
         }
 
         private const int serverPort = 12000;
@@ -70,10 +83,6 @@ namespace Completed
             if (peers == null)
             {
                 peers = new Peer[GameManager.MaxNumPlayers];
-                for (int peerIdx = 0; peerIdx < GameManager.MaxNumPlayers; ++peerIdx)
-                {
-                    peers[peerIdx] = new Peer();
-                }
             }
         }
 
@@ -103,10 +112,7 @@ namespace Completed
         {
             if (numPeers < GameManager.MaxNumPlayers)
             {
-                peers[numPeers].playerName = playerName;
-                peers[numPeers].host = isHost;
-                peers[numPeers].local = isLocal;
-                peers[numPeers].peerIdx = numPeers;
+                peers[numPeers] = new Peer(playerName, numPeers, isLocal, isHost);
                 numPeers++;
             }
             else

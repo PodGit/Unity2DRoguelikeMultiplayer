@@ -37,7 +37,7 @@ namespace Completed
 
                     GameObject currentPanel = GameObject.Find("LobbyPlayerPanel" + (playerIdx + 1));
                     UnityEngine.UI.Text currentPanelNameText = currentPanel.transform.Find("LobbyPlayerNameText").GetComponent<UnityEngine.UI.Text>();
-                    currentPanelNameText.text = "Name: " + currentPeer.playerName;
+                    currentPanelNameText.text = "Name: " + currentPeer.GetName();
                 }
             }
         }

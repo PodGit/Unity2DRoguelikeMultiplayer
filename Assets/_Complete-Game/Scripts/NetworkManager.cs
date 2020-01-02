@@ -63,6 +63,11 @@ public class NetworkManager : MonoBehaviour
         
     }
 
+    public bool IsActive()
+    {
+        return (netState == NetState.ActiveClient || netState == NetState.ActiveHost);
+    }
+
     public void Host()
     {
         if (netState == NetState.Uninitialised)

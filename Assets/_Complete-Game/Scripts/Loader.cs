@@ -1,6 +1,4 @@
-﻿#define ENABLE_NETWORKING
-
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 
 namespace Completed

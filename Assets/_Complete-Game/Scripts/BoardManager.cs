@@ -38,11 +38,10 @@ namespace Completed
 		public GameObject[] outerWallTiles;								//Array of outer tile prefabs.
 		
 		private Transform boardHolder;									//A variable to store a reference to the transform of our Board object.
-		private List <Vector3> gridPositions = new List <Vector3> ();	//A list of possible locations to place tiles.
-		
-		
-		//Clears our list gridPositions and prepares it to generate a new board.
-		void InitialiseList ()
+		private List <Vector3> gridPositions = new List <Vector3> ();   //A list of possible locations to place tiles.
+
+        //Clears our list gridPositions and prepares it to generate a new board.
+        void InitialiseList ()
 		{
 			//Clear our list gridPositions.
 			gridPositions.Clear ();
@@ -148,9 +147,14 @@ namespace Completed
 			
 			//Instantiate a random number of enemies based on minimum and maximum, at randomized positions.
 			LayoutObjectAtRandom (enemyTiles, enemyCount, enemyCount);
-			
-			//Instantiate the exit tile in the upper right hand corner of our game board
-			Instantiate (exit, new Vector3 (columns - 1, rows - 1, 0f), Quaternion.identity);
-		}
+
+            int numExits = GameManager.instance.numPlayers;
+
+            for (int playerNum = 0; playerNum < numExits; ++playerNum)
+            {
+                //Instantiate the exit tile in the upper right hand corner of our game board
+                Instantiate(exit, new Vector3(columns - 1 - playerNum, rows - 1, 0f), Quaternion.identity);
+            }
+        }
 	}
 }

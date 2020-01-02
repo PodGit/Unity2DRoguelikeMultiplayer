@@ -11,7 +11,6 @@ namespace Completed
 	{
 		public float levelStartDelay = 2f;						//Time to wait before starting level, in seconds.
 		public float turnDelay = 0.1f;							//Delay between each Player turn.
-		public int playerFoodPoints = 100;						//Starting value for Player food points.
 		public static GameManager instance = null;				//Static instance of GameManager which allows it to be accessed by any other script.
 		[HideInInspector] public bool playersTurn = true;		//Boolean to check if it's players turn, hidden in inspector but public.
 		
@@ -22,12 +21,17 @@ namespace Completed
 		private int level = 0;									//Current level number, expressed in game as "Day 1".
 		private List<Enemy> enemies;							//List of all Enemy units, used to issue them move commands.
 		private bool enemiesMoving;								//Boolean to check if enemies are moving.
-		private bool doingSetup = true;							//Boolean to check if we're setting up board, prevent Player from moving during setup.
-		
-		
-		
-		//Awake is always called before any Start functions
-		void Awake()
+		private bool doingSetup = true;                         //Boolean to check if we're setting up board, prevent Player from moving during setup.
+
+        //Network
+        public const int MaxNumPlayers = 4;
+        public int startFoodPoints = 100;
+        public int numPlayers { get; set; } = 1;
+        private int[] playerFoodPoints;
+        public GameObject PlayerPrefab;
+
+        //Awake is always called before any Start functions
+        void Awake()
 		{
             //Check if instance already exists
             if (instance == null)
@@ -97,12 +101,29 @@ namespace Completed
 			
 			//Call the SetupScene function of the BoardManager script, pass it current level number.
 			boardScript.SetupScene(level);
-			
-		}
-		
-		
-		//Hides black image used between levels
-		void HideLevelImage()
+
+            playerFoodPoints = new int[MaxNumPlayers];
+            for (int playerIdx = 0; playerIdx < MaxNumPlayers; ++playerIdx)
+            {
+                playerFoodPoints[playerIdx] = startFoodPoints;
+
+                // skip player 1 as it spawns with scene
+                if (playerIdx > 0 && playerIdx < GameManager.instance.numPlayers)
+                {
+                    Debug.Assert(PlayerPrefab != null, "Player prefab not set");
+
+                    Vector3 spawnVector = new Vector3(playerIdx, 0, 0);
+                    GameObject spawnedObject = Instantiate(PlayerPrefab, spawnVector, Quaternion.identity);
+                    Player spawnedPlayer = spawnedObject.GetComponent<Player>();
+
+                    spawnedPlayer.Local = false;
+                    spawnedPlayer.playerId = playerIdx;
+                }
+            }
+        }
+
+        //Hides black image used between levels
+        void HideLevelImage()
 		{
 			//Disable the levelImage gameObject.
 			levelImage.SetActive(false);
@@ -177,11 +198,22 @@ namespace Completed
 			enemiesMoving = false;
 		}
 
-        public void InitSolo()
+        public int GetCurrentFoodPoints()
         {
-            SceneManager.LoadScene("");
-            InitGame();
+            int currentPoints = 0;
+
+            for (int playerIdx = 0; playerIdx < numPlayers; playerIdx++)
+            {
+                currentPoints += playerFoodPoints[playerIdx];
+            }
+
+            return currentPoints;
         }
-	}
+
+        public void SetPlayerFoodPoints(int playerId, int food)
+        {
+            playerFoodPoints[playerId] = food;
+        }
+    }
 }
 

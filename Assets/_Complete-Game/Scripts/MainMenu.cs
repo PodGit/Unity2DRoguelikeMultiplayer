@@ -30,8 +30,7 @@ namespace Completed
         {
             UnityEngine.UI.Text playerNameText = GameObject.Find("MainMenuNameInputText").GetComponent<UnityEngine.UI.Text>();
 
-            NetworkManager.Instance.AddPeer(playerNameText.text, true, true);
-            NetworkManager.Instance.Host();
+            NetworkManager.Instance.Host(playerNameText.text);
             SceneManager.LoadScene("lobby");
         }
 

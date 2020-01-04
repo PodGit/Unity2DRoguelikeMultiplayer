@@ -31,6 +31,21 @@ namespace Completed
             state = peerState;
         }
 
+        public void Release()
+        {
+            if (client != null)
+            {
+                if (client.Connected)
+                {
+                    client.GetStream().Close();
+                    client.GetStream().Dispose();
+                }
+                client.Close();
+                client.Dispose();
+                client = null;
+            }
+        }
+
         public string GetName()
         {
             return peerName;
@@ -46,9 +61,19 @@ namespace Completed
             return client;
         }
 
+        public void SetClient(TcpClient client)
+        {
+            this.client = client;
+        }
+
         public int GetPeerId()
         {
             return peerIdx;
+        }
+
+        public PeerState GetState()
+        {
+            return state;
         }
 
         // Start is called before the first frame update

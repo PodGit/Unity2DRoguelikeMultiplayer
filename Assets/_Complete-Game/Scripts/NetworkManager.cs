@@ -33,10 +33,7 @@ namespace Completed
         private static NetState netState = NetState.Uninitialised;
         private static NetworkManager mInstance;
 
-
         private TcpListener serverListener = null;
-        private TcpClient joiningTcpClient = null;
-        private byte[][] readBuffers;
 
         // Peers
         private static int numPeers = 0;
@@ -44,15 +41,18 @@ namespace Completed
         private static List<PeerCallBack> peerAddedCallbacks;
         private static List<PeerCallBack> peerRemovedCallbacks;
 
+        private System.Threading.Thread connectionThread = null;
+        private System.Threading.Thread dataThread = null;
+
         public static NetworkManager Instance
         {
             get
             {
                 if (mInstance == null)
                 {
-                    //GameObject go = new GameObject();
+                    //GameObject go = new GameObject("Network Manager");
                     //mInstance = go.AddComponent<NetworkManager>();
-                    mInstance = ScriptableObject.CreateInstance<NetworkManager>();
+                    mInstance = (NetworkManager)ScriptableObject.CreateInstance("NetworkManager");
                 }
                 return mInstance;
             }
@@ -60,12 +60,6 @@ namespace Completed
 
         public NetworkManager()
         {
-            readBuffers = new byte[GameManager.MaxNumPlayers][];
-            for (int bufferIndex = 0; bufferIndex < GameManager.MaxNumPlayers; ++bufferIndex)
-            {
-                readBuffers[bufferIndex] = new byte[bufferSize];
-            }
-
             if (peers == null)
             {
                 peers = new NetworkPeer[GameManager.MaxNumPlayers];
@@ -73,6 +67,70 @@ namespace Completed
 
             peerAddedCallbacks = new List<PeerCallBack>();
             peerRemovedCallbacks = new List<PeerCallBack>();
+        }
+
+        public void Reset()
+        {
+            Debug.Log("NetworkManager: Reset() called");
+            ReleaseAllSockets();
+
+            netState = NetState.Uninitialised;
+
+            for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
+            {
+                Debug.Log("ReleaseAllSockets: Releasing peer " + peerIdx);
+                NetworkPeer peer = GetPeer(peerIdx);
+                peer.Release();
+                peers[peerIdx] = null;
+            }
+
+            numPeers = 0;
+
+            peerAddedCallbacks.Clear();
+            peerRemovedCallbacks.Clear();
+        }
+
+        public void OnApplicationQuit()
+        {
+            Debug.Log("NetworkManager: Application quit, releasing all sockets...");
+            Reset();
+        }
+
+        void ReleaseAllSockets()
+        {
+            if (connectionThread != null)
+            {
+                Debug.Log("ReleaseAllSockets: Connection thread not null, removing...");
+                if (connectionThread.IsAlive)
+                {
+                    Debug.Log("ReleaseAllSockets: Connection thread alive, waiting to exit...");
+                    connectionThread.Interrupt();
+                    connectionThread.Abort();
+                    connectionThread.Join();
+                }
+                connectionThread = null;
+            }
+
+            if (dataThread != null)
+            {
+                Debug.Log("ReleaseAllSockets: Data thread not null, removing...");
+                if (dataThread.IsAlive)
+                {
+                    Debug.Log("ReleaseAllSockets: Data thread alive, waiting to exit...");
+                    dataThread.Interrupt();
+                    dataThread.Abort();
+                    dataThread.Join();
+                }
+                dataThread = null;
+            }
+
+            if (serverListener != null)
+            {
+                Debug.Log("ReleaseAllSockets: Server listener not null, stopping...");
+                serverListener.Stop();
+                serverListener.Server.Dispose();
+                serverListener = null;
+            }
         }
 
         // Start is called before the first frame update
@@ -84,15 +142,7 @@ namespace Completed
         // Update is called once per frame
         void Update()
         {
-            for (int peerdIdx = 0; peerdIdx < numPeers; ++peerdIdx)
-            {
-                NetworkPeer peer = GetPeer(peerdIdx);
-                if (!peer.IsLocal())
-                {
-                    TcpClient client = peer.GetClient();
-                    NetworkStream stream = client.GetStream();
-                }
-            }
+
         }
 
         public bool IsActive()
@@ -127,7 +177,7 @@ namespace Completed
 
         public NetworkPeer GetPeer(int peerIdx)
         {
-            Debug.Assert(peerIdx >= 0 /*&& peerIdx < NetworkManager.Instance.numPeers*/, "GetPeer invalid index specified:" + peerIdx);
+            Debug.Assert(peerIdx >= 0 && peerIdx < numPeers, "GetPeer invalid index specified:" + peerIdx);
 
             return peers[peerIdx];
         }
@@ -152,102 +202,119 @@ namespace Completed
 
             netState = NetState.ActiveHost;
 
-            Debug.Log("Waiting for connection...");
-            serverListener.BeginAcceptTcpClient(new AsyncCallback(ServerAcceptCallback), serverListener);
+            Debug.Assert(connectionThread == null, "connection thread already initialised");
+            connectionThread = new Thread(ServerConnectionThreadProc);
+            connectionThread.Start();
+
+            InitDataThread();            
         }
 
-        void ServerAcceptCallback(IAsyncResult ar)
+        void ServerConnectionThreadProc()
         {
-            TcpListener listener = (TcpListener)ar.AsyncState;
-            TcpClient connectedClient = listener.EndAcceptTcpClient(ar);
-
-            Debug.Log("Accepted new connection!");
-            NetworkPeer newPeer = AddPeer("Joining...", false, false, connectedClient, NetworkPeer.PeerState.Joining);
-            connectedClient.GetStream().BeginRead(readBuffers[newPeer.GetPeerId()], 0, bufferSize, new AsyncCallback(ServerReadCallback), connectedClient);
-
-            if (numPeers < GameManager.MaxNumPlayers)
+            while (true)
             {
                 Debug.Log("Waiting for connection...");
-                listener.BeginAcceptTcpClient(new AsyncCallback(ServerAcceptCallback), listener);
-            }
-            else
-            {
-                listener.Stop();
+                TcpClient connectedClient = serverListener.AcceptTcpClient();
+
+                Debug.Log("Accepted new connection!");
+                NetworkPeer newPeer = AddPeer("Joining...", false, false, connectedClient, NetworkPeer.PeerState.Joining);
+
+                if (numPeers >= GameManager.MaxNumPlayers)
+                {
+                    Debug.Log("Accepted max num connections. Exiting server connection thread...");
+                    return;
+                }
             }
         }
 
-        void ServerReadCallback(IAsyncResult ar)
+        void InitDataThread()
         {
-            TcpClient client = (TcpClient)ar.AsyncState;
-            int size = client.GetStream().EndRead(ar);
+            Debug.Assert(dataThread == null, "data thread already initialised");
+            dataThread = new Thread(DataThreadProc);
+            dataThread.Start();
+        }
 
-            if (size > 0)
+        void DataThreadProc()
+        {
+            while (true)
             {
-                OnPacketRecieved(client, size);
+                for (int peerIdx = 0; peerIdx < numPeers; peerIdx++)
+                {
+                    NetworkPeer peer = GetPeer(peerIdx);
+                    if (!peer.IsLocal() && peer.GetState() != NetworkPeer.PeerState.Uninitialised)
+                    {
+                        TcpClient client = peer.GetClient();
+                        byte[] buffer = new byte[bufferSize];
+
+                        while (client.GetStream().DataAvailable)
+                        {
+                            int sizeRead = client.GetStream().Read(buffer, 0, bufferSize);
+                            OnPacketRecieved(peer, buffer, sizeRead);
+                        }
+                    }
+                }
             }
+        }
 
-            NetworkPeer peer = GetPeerForTcpClient(client);
-
+        void OnPacketRecieved(NetworkPeer peer, byte[] buffer, int size)
+        {
             if (peer != null)
             {
-                client.GetStream().BeginRead(readBuffers[peer.GetPeerId()], 0, bufferSize, new AsyncCallback(ServerReadCallback), client);
+                int peerIdx = peer.GetPeerId();
+                Debug.Log("Packet received from peer:" + peerIdx);
             }
         }
 
-        public void Join(string ipAddress)
+        public void Join(string ipAddress, string playerName)
         {
             if (netState == NetState.Uninitialised)
             {
-                ClientCreateSocket(ipAddress);
+                NetworkPeer localPeer = AddPeer(playerName, true, false, null, NetworkPeer.PeerState.Joined);
+                ClientCreateSocket(ipAddress, localPeer);
+
+                InitDataThread();
             }
         }
 
-        void ClientCreateSocket(string ipAddress)
+        void ClientCreateSocket(string ipAddress, NetworkPeer myPeer)
         {
-            Debug.Assert(joiningTcpClient == null, "Client socket already instantiated");
+            Debug.Assert(myPeer.GetClient() == null, "Client socket already instantiated");
 
             IPAddress localIpAddress = IPAddress.Parse(ipAddress);
             IPEndPoint localEndPoint = new IPEndPoint(localIpAddress, clientPort);
 
-            joiningTcpClient = new TcpClient(localEndPoint);
+            TcpClient newClient = new TcpClient(localEndPoint);
+            myPeer.SetClient(newClient);
 
             Debug.Log("Attempting to join " + ipAddress + "...");
+            Debug.Assert(connectionThread == null, "Connection thread not null");
 
             IPAddress remoteIpAddress = IPAddress.Parse(ipAddress);
-            IAsyncResult result = joiningTcpClient.BeginConnect(remoteIpAddress, serverPort, new AsyncCallback(ClientConnectCallback), joiningTcpClient);
-            netState = NetState.Joining;
+            connectionThread = new Thread(ClientConnectionThreadProc);
+            connectionThread.Start(remoteIpAddress);
         }
 
-        void ClientConnectCallback(IAsyncResult ar)
+        void ClientConnectionThreadProc(object data)
         {
-            TcpClient client = (TcpClient)ar.AsyncState;
-            client.EndConnect(ar);
+            netState = NetState.Joining;
 
-            if (client.Connected)
+            NetworkPeer peer = GetMyPeer();
+            TcpClient tcpClient = peer.GetClient();
+            IPAddress ipAddress = (IPAddress)data;
+
+            tcpClient.Connect(ipAddress, serverPort);
+
+            if (tcpClient.Connected)
             {
-                Debug.Log("Received connection");
-                NetworkPeer hostPeer = AddPeer("Host...", false, true, client, NetworkPeer.PeerState.Joined);
+                NetworkPeer hostPeer = AddPeer("Host...", false, true, tcpClient, NetworkPeer.PeerState.Joined);
                 netState = NetState.ActiveClient;
 
-                client.GetStream().BeginRead(readBuffers[hostPeer.GetPeerId()], 0, bufferSize, new AsyncCallback(ClientReadCallback), client);
+                InitDataThread();
             }
             else
             {
-                Debug.Log("Connection failed");
+                Debug.Log("Failed to connect to host:" + ipAddress.ToString());
                 ClientConnectionFailed();
-            }
-
-            joiningTcpClient = null;
-        }
-
-        void ClientReadCallback(IAsyncResult ar)
-        {
-            TcpClient client = (TcpClient)ar.AsyncState;
-            int size = client.GetStream().EndRead(ar);
-
-            if (size > 0)
-            {
-                OnPacketRecieved(client, size);
             }
         }
 
@@ -256,9 +323,29 @@ namespace Completed
             Debug.Assert(netState == NetState.Joining, "Not in joining state");
             netState = NetState.Uninitialised;
 
-            joiningTcpClient.Close();
-            joiningTcpClient.Dispose();
-            joiningTcpClient = null;
+            for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
+            {
+                NetworkPeer peer = GetPeer(peerIdx);
+                peer.Release();
+                peers[peerIdx] = null;
+            }
+
+            numPeers = 0;
+        }
+
+        NetworkPeer GetMyPeer()
+        {
+            for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
+            {
+                NetworkPeer peer = GetPeer(peerIdx);
+
+                if (peer.IsLocal())
+                {
+                    return peer;
+                }
+            }
+
+            return null;
         }
 
         NetworkPeer GetPeerForTcpClient(TcpClient client)
@@ -274,18 +361,6 @@ namespace Completed
             }
 
             return null;
-        }
-
-        void OnPacketRecieved(TcpClient fromClient, int size)
-        {
-            NetworkPeer peer = GetPeerForTcpClient(fromClient);
-
-            if (peer != null)
-            {
-                int peerIdx = peer.GetPeerId();
-                byte[] buffer = readBuffers[peerIdx];
-                Debug.Log("Packet received from peer:" + peerIdx);
-            }
         }
 
         public void RegisterPeerAddedCallback(PeerCallBack cb)

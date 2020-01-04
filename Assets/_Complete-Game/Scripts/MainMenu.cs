@@ -28,9 +28,7 @@ namespace Completed
 
         public void StartGameHost()
         {
-            UnityEngine.UI.Text playerNameText = GameObject.Find("MainMenuNameInputText").GetComponent<UnityEngine.UI.Text>();
-
-            NetworkManager.Instance.Host(playerNameText.text);
+            NetworkManager.Instance.Host(GetName());
             SceneManager.LoadScene("lobby");
         }
 
@@ -43,7 +41,8 @@ namespace Completed
 
                 if (ipAddress.Length > 0)
                 {
-                    NetworkManager.Instance.Join(ipAddress);
+                    NetworkManager.Instance.Join(ipAddress, GetName());
+                    SceneManager.LoadScene("lobby");
                 }
                 else
                 {
@@ -54,6 +53,17 @@ namespace Completed
             {
                 Debug.Log("Exception: " + e.ToString());
             }
+        }
+
+        string GetName()
+        {
+            UnityEngine.UI.Text playerNameText = GameObject.Find("MainMenuNameInputText").GetComponent<UnityEngine.UI.Text>();
+            return playerNameText.text;
+        }
+
+        public void ExitGame()
+        {
+            Application.Quit();
         }
     }
 }

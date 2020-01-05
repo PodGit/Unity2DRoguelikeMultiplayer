@@ -56,6 +56,11 @@ namespace Completed
             return local;
         }
 
+        public bool IsHost()
+        {
+            return host;
+        }
+
         public TcpClient GetClient()
         {
             return client;

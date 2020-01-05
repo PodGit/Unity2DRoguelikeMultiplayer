@@ -11,14 +11,14 @@ public class NetworkPacket
     private byte[] buffer;
     private int currentSize;
 
-    enum PacketType : byte
+    public enum PacketType : byte
     {
         JOIN_REQUEST,
         JOIN_ACKNOWLEDGE,
         PEER_DATA
     }
 
-    enum DataType : byte
+    public enum DataType : byte
     {
         INTEGER,
         STRING
@@ -42,7 +42,7 @@ public class NetworkPacket
         
     }
 
-    void SetType(PacketType type)
+    public void SetType(PacketType type)
     {
         Debug.Assert(currentSize == 0, "Packet isn't empty");
         buffer[0] = (byte)type;
@@ -54,7 +54,7 @@ public class NetworkPacket
         currentSize += numToAdd;
     }
 
-    void WriteInt(int inInt)
+    public void WriteInt(int inInt)
     {
         buffer[currentSize] = (byte)DataType.INTEGER;
         IncreasePacketSize(1);
@@ -69,7 +69,7 @@ public class NetworkPacket
         IncreasePacketSize(numBytes);
     }
 
-    void WriteString(string inString)
+    public void WriteString(string inString)
     {
         buffer[currentSize] = (byte)DataType.STRING;
         IncreasePacketSize(1);

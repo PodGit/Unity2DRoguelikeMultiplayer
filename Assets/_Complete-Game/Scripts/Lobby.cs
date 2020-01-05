@@ -21,6 +21,9 @@ namespace Completed
 
             InitPanels();
             RefreshPanels();
+
+            GameObject go = new GameObject("Debugger");
+            go.AddComponent<Debugger>();
         }
 
         // Update is called once per frame

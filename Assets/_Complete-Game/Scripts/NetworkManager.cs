@@ -28,6 +28,7 @@ namespace Completed
         private const int serverPort = 12000;
         private const int clientPort = 13000;
         private const int bufferSize = 256;
+        private const int maxNumPacketsToSendPerIteration = 20;
         private const int maxNumConnectionsToListenFor = 1;
 
         private static NetState netState = NetState.Uninitialised;
@@ -43,6 +44,9 @@ namespace Completed
 
         private System.Threading.Thread connectionThread = null;
         private System.Threading.Thread dataThread = null;
+
+        private static Mutex writeQueueMutex;
+        private static Queue<NetworkPacket> writeQueue;
 
         public static NetworkManager Instance
         {
@@ -67,6 +71,11 @@ namespace Completed
 
             peerAddedCallbacks = new List<PeerCallBack>();
             peerRemovedCallbacks = new List<PeerCallBack>();
+
+            writeQueueMutex = new Mutex();
+            writeQueue = new Queue<NetworkPacket>();
+
+            Reset();
         }
 
         public void Reset()
@@ -88,6 +97,10 @@ namespace Completed
 
             peerAddedCallbacks.Clear();
             peerRemovedCallbacks.Clear();
+
+            writeQueueMutex.Close();
+            writeQueueMutex = new Mutex();
+            writeQueue.Clear();
         }
 
         public void OnApplicationQuit()
@@ -142,7 +155,6 @@ namespace Completed
         // Update is called once per frame
         void Update()
         {
-
         }
 
         public bool IsActive()
@@ -238,6 +250,7 @@ namespace Completed
         {
             while (true)
             {
+                // Check for outstanding reads
                 for (int peerIdx = 0; peerIdx < numPeers; peerIdx++)
                 {
                     NetworkPeer peer = GetPeer(peerIdx);
@@ -251,6 +264,25 @@ namespace Completed
                             int sizeRead = client.GetStream().Read(buffer, 0, bufferSize);
                             OnPacketRecieved(peer, buffer, sizeRead);
                         }
+                    }
+                }
+
+                // Write packets
+                if (writeQueue.Count > 0)
+                {
+                    writeQueueMutex.WaitOne();
+                    Queue<NetworkPacket> packetsToSendThisIteration = new Queue<NetworkPacket>();
+
+                    while(writeQueue.Count > 0 && packetsToSendThisIteration.Count < maxNumPacketsToSendPerIteration)
+                    {
+                        packetsToSendThisIteration.Enqueue(writeQueue.Dequeue());
+                    }
+
+                    writeQueueMutex.ReleaseMutex();
+
+                    while (packetsToSendThisIteration.Count > 0)
+                    {
+                        NetworkPacket packet = packetsToSendThisIteration.Dequeue();                        
                     }
                 }
             }
@@ -269,22 +301,22 @@ namespace Completed
         {
             if (netState == NetState.Uninitialised)
             {
-                NetworkPeer localPeer = AddPeer(playerName, true, false, null, NetworkPeer.PeerState.Joined);
-                ClientCreateSocket(ipAddress, localPeer);
+                //NetworkPeer localPeer = AddPeer(playerName, true, false, null, NetworkPeer.PeerState.Joined);
+                ClientCreateSocket(ipAddress, GetHostPeer());
 
                 InitDataThread();
             }
         }
 
-        void ClientCreateSocket(string ipAddress, NetworkPeer myPeer)
+        void ClientCreateSocket(string ipAddress, NetworkPeer peer)
         {
-            Debug.Assert(myPeer.GetClient() == null, "Client socket already instantiated");
+            Debug.Assert(peer.GetClient() == null, "Client socket already instantiated");
 
             IPAddress localIpAddress = IPAddress.Parse(ipAddress);
             IPEndPoint localEndPoint = new IPEndPoint(localIpAddress, clientPort);
 
             TcpClient newClient = new TcpClient(localEndPoint);
-            myPeer.SetClient(newClient);
+            peer.SetClient(newClient);
 
             Debug.Log("Attempting to join " + ipAddress + "...");
             Debug.Assert(connectionThread == null, "Connection thread not null");
@@ -309,7 +341,7 @@ namespace Completed
                 NetworkPeer hostPeer = AddPeer("Host...", false, true, tcpClient, NetworkPeer.PeerState.Joined);
                 netState = NetState.ActiveClient;
 
-                InitDataThread();
+                SendPeerData();                
             }
             else
             {
@@ -333,6 +365,24 @@ namespace Completed
             numPeers = 0;
         }
 
+        void SendPeerData()
+        {
+            NetworkPeer peer = GetMyPeer();
+
+            NetworkPacket joinPacket = new NetworkPacket();
+            joinPacket.SetType(NetworkPacket.PacketType.PEER_DATA);
+            joinPacket.WriteString(peer.GetName());
+
+            AddPacketToQueue(joinPacket);
+        }
+
+        void AddPacketToQueue(NetworkPacket packet)
+        {
+            writeQueueMutex.WaitOne();
+            writeQueue.Enqueue(packet);
+            writeQueueMutex.ReleaseMutex();
+        }
+
         NetworkPeer GetMyPeer()
         {
             for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
@@ -340,6 +390,21 @@ namespace Completed
                 NetworkPeer peer = GetPeer(peerIdx);
 
                 if (peer.IsLocal())
+                {
+                    return peer;
+                }
+            }
+
+            return null;
+        }
+
+        NetworkPeer GetHostPeer()
+        {
+            for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
+            {
+                NetworkPeer peer = GetPeer(peerIdx);
+
+                if (peer.IsHost())
                 {
                     return peer;
                 }

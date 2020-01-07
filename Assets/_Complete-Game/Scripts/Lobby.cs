@@ -24,6 +24,12 @@ namespace Completed
 
             GameObject go = new GameObject("Debugger");
             go.AddComponent<Debugger>();
+
+            GameObject startGameBtn = GameObject.Find("LobbyBtnStartGame");
+            if (!NetworkManager.Instance.IsHost())
+            {
+                startGameBtn.SetActive(false);
+            }
         }
 
         // Update is called once per frame
@@ -33,6 +39,11 @@ namespace Completed
             {
                 RefreshPanels();
                 panelsNeedsRefreshed = false;
+            }
+
+            if (NetworkManager.Instance.GetGameStarted())
+            {
+                StartGame();
             }
         }
 
@@ -92,6 +103,17 @@ namespace Completed
         {
             NetworkManager.Instance.Reset();
             SceneManager.LoadScene("MainMenu");
+        }
+
+        public void StartGamePressed()
+        {
+            NetworkManager.Instance.StartGame();
+            StartGame();
+        }
+
+        void StartGame()
+        {
+            SceneManager.LoadScene("GameScene");
         }
     }
 }

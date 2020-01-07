@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Completed
 {
@@ -30,6 +31,9 @@ namespace Completed
             public NetworkPacket packet;
             public NetworkPeer recipient;
         }
+
+        //game stuff
+        private bool gameStarted = false;
 
         private const int serverPort = 12000;
         private const int clientPort = 13000;
@@ -161,6 +165,11 @@ namespace Completed
         // Update is called once per frame
         void Update()
         {
+        }
+
+        public bool IsHost()
+        {
+            return GetMyPeer() == GetHostPeer();
         }
 
         public bool IsActive()
@@ -320,6 +329,9 @@ namespace Completed
                         peer.SetName(name);
                         peer.SetState(NetworkPeer.PeerState.Joined);
                         break;
+                    case NetworkPacket.PacketType.START_GAME:
+                        gameStarted = true;
+                        break;
                     default:
                         break;
                 }
@@ -407,15 +419,45 @@ namespace Completed
             SendPacketToPeer(joinPacket, toPeer);
         }
 
+        void SendStartGamePacket(NetworkPeer toPeer)
+        {
+            NetworkPeer myPeer = GetMyPeer();
+
+            NetworkPacket startPacket = new NetworkPacket();
+            startPacket.SetPacketType(NetworkPacket.PacketType.START_GAME);
+
+            SendPacketToPeer(startPacket, toPeer);
+        }
+
         void SendPacketToPeer(NetworkPacket packet, NetworkPeer peer)
         {
             PendingPacket newPacket;
             newPacket.packet = packet;
             newPacket.recipient = peer;
+            Debug.Log("Sending " + (int)packet.GetPacketType() + " to peer " + peer.GetPeerId());
 
             writeQueueMutex.WaitOne();
             writeQueue.Enqueue(newPacket);
             writeQueueMutex.ReleaseMutex();
+        }
+
+        public void StartGame()
+        {
+            Debug.Assert(IsHost(), "Can't call start game as non-host");
+
+            for (int peerIdx = 0; peerIdx < numPeers; peerIdx++)
+            {
+                NetworkPeer peer = GetPeer(peerIdx);
+                if (peer != null && !peer.IsLocal())
+                {
+                    SendStartGamePacket(peer);
+                }
+            }
+        }
+
+        public bool GetGameStarted()
+        {
+            return gameStarted;
         }
 
         NetworkPeer GetMyPeer()

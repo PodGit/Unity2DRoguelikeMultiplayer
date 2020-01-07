@@ -18,7 +18,8 @@ public class NetworkPacket
     {
         JOIN_REQUEST,
         JOIN_ACKNOWLEDGE,
-        INIT_PEER_DATA
+        INIT_PEER_DATA,
+        START_GAME
     }
 
     public enum DataType : byte

@@ -51,6 +51,11 @@ namespace Completed
             return peerName;
         }
 
+        public void SetName(string name)
+        {
+            peerName = name;
+        }
+
         public bool IsLocal()
         {
             return local;
@@ -59,6 +64,11 @@ namespace Completed
         public bool IsHost()
         {
             return host;
+        }
+
+        public void SetState(PeerState state)
+        {
+            this.state = state;
         }
 
         public TcpClient GetClient()

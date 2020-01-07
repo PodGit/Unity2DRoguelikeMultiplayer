@@ -42,7 +42,7 @@ namespace Completed
                 if (ipAddress.Length > 0)
                 {
                     NetworkManager.Instance.Join(ipAddress, GetName());
-                    SceneManager.LoadScene("lobby");
+                    SceneManager.LoadScene("Lobby");
                 }
                 else
                 {

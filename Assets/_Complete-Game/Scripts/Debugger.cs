@@ -30,18 +30,21 @@ namespace Completed
             {
                 NetworkPeer peer = NetworkManager.Instance.GetPeer(peerIdx);
 
-                string peerData = "";
-                peerData += "------------------------\n";
-                peerData += "| Peer " + peer.GetPeerId() + "\n";
-                peerData += "| State " + (int)peer.GetState() + "\n";
-                peerData += "| Name " + peer.GetName() + "\n";
-                peerData += "| Client set?: " + (peer.GetClient()!=null ? "yes":"no") + "\n";
-                peerData += "| IsLocal " + (peer.IsLocal()?"yes":"no") + "\n";
-                peerData += "| IsHost " + (peer.IsHost() ? "yes" : "no") + "\n";
-                peerData += "------------------------";
+                if (peer != null)
+                {
+                    string peerData = "";
+                    peerData += "------------------------\n";
+                    peerData += "| Peer " + peer.GetPeerId() + "\n";
+                    peerData += "| State " + (int)peer.GetState() + "\n";
+                    peerData += "| Name " + peer.GetName() + "\n";
+                    peerData += "| Client set?: " + (peer.GetClient() != null ? "yes" : "no") + "\n";
+                    peerData += "| IsLocal " + (peer.IsLocal() ? "yes" : "no") + "\n";
+                    peerData += "| IsHost " + (peer.IsHost() ? "yes" : "no") + "\n";
+                    peerData += "------------------------";
 
-                Rect position = new Rect(labelX + (peerIdx * labelSpacing), labelY, labelWidth, labelHeight);
-                GUI.Label(position, peerData);
+                    Rect position = new Rect(labelX + (peerIdx * labelSpacing), labelY, labelWidth, labelHeight);
+                    GUI.Label(position, peerData);
+                }
             }
         }
     }

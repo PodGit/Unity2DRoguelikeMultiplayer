@@ -10,12 +10,15 @@ public class NetworkPacket
 
     private byte[] buffer;
     private int currentSize;
+    private PacketType type;
+
+    private int readOffset = 0;
 
     public enum PacketType : byte
     {
         JOIN_REQUEST,
         JOIN_ACKNOWLEDGE,
-        PEER_DATA
+        INIT_PEER_DATA
     }
 
     public enum DataType : byte
@@ -30,6 +33,14 @@ public class NetworkPacket
         currentSize = 0;
     }
 
+    public NetworkPacket(byte[] buffer, int size)
+    {
+        this.buffer = buffer;
+        currentSize = size;
+
+        Parse();
+    }
+
     // Start is called before the first frame update
     void Start()
     {
@@ -42,11 +53,18 @@ public class NetworkPacket
         
     }
 
-    public void SetType(PacketType type)
+    public void SetPacketType(PacketType type)
     {
         Debug.Assert(currentSize == 0, "Packet isn't empty");
+
+        this.type = type;
         buffer[0] = (byte)type;
         IncreasePacketSize(1);
+    }
+
+    public PacketType GetPacketType()
+    {
+        return type;
     }
 
     void IncreasePacketSize(int numToAdd)
@@ -84,9 +102,35 @@ public class NetworkPacket
         IncreasePacketSize(numBytes);
     }
 
-    void GetBytes(out byte[] output, out int size)
+    public string ReadString()
+    {
+        DataType dataType = (DataType)buffer[readOffset];
+        readOffset++;
+
+        Debug.Assert(dataType == DataType.STRING, "ReadString: Data type wasn't string");
+
+        int numBytes = (int)buffer[readOffset];
+        readOffset++;
+
+        Debug.Log("ReadString numBytes:" + numBytes);
+
+        byte[] stringArray = new byte[NetworkPacket.MAX_PACKET_SIZE];
+        Array.Copy(buffer, readOffset, stringArray, 0, numBytes);
+
+        readOffset += numBytes;
+
+        return Encoding.ASCII.GetString(stringArray);
+    }
+
+    public void GetBytes(out byte[] output, out int size)
     {
         output = buffer;
         size = currentSize;
+    }
+
+    void Parse()
+    {
+        this.type = (PacketType)buffer[0];
+        readOffset++;
     }
 }

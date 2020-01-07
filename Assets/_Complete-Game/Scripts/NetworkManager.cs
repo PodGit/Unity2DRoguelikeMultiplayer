@@ -25,6 +25,12 @@ namespace Completed
             Error
         }
 
+        struct PendingPacket
+        {
+            public NetworkPacket packet;
+            public NetworkPeer recipient;
+        }
+
         private const int serverPort = 12000;
         private const int clientPort = 13000;
         private const int bufferSize = 256;
@@ -46,7 +52,7 @@ namespace Completed
         private System.Threading.Thread dataThread = null;
 
         private static Mutex writeQueueMutex;
-        private static Queue<NetworkPacket> writeQueue;
+        private static Queue<PendingPacket> writeQueue;
 
         public static NetworkManager Instance
         {
@@ -73,7 +79,7 @@ namespace Completed
             peerRemovedCallbacks = new List<PeerCallBack>();
 
             writeQueueMutex = new Mutex();
-            writeQueue = new Queue<NetworkPacket>();
+            writeQueue = new Queue<PendingPacket>();
 
             Reset();
         }
@@ -231,6 +237,8 @@ namespace Completed
                 Debug.Log("Accepted new connection!");
                 NetworkPeer newPeer = AddPeer("Joining...", false, false, connectedClient, NetworkPeer.PeerState.Joining);
 
+                SendPeerData(newPeer);
+
                 if (numPeers >= GameManager.MaxNumPlayers)
                 {
                     Debug.Log("Accepted max num connections. Exiting server connection thread...");
@@ -254,7 +262,7 @@ namespace Completed
                 for (int peerIdx = 0; peerIdx < numPeers; peerIdx++)
                 {
                     NetworkPeer peer = GetPeer(peerIdx);
-                    if (!peer.IsLocal() && peer.GetState() != NetworkPeer.PeerState.Uninitialised)
+                    if (!peer.IsLocal() && peer.GetClient().Connected)
                     {
                         TcpClient client = peer.GetClient();
                         byte[] buffer = new byte[bufferSize];
@@ -271,7 +279,7 @@ namespace Completed
                 if (writeQueue.Count > 0)
                 {
                     writeQueueMutex.WaitOne();
-                    Queue<NetworkPacket> packetsToSendThisIteration = new Queue<NetworkPacket>();
+                    Queue<PendingPacket> packetsToSendThisIteration = new Queue<PendingPacket>();
 
                     while(writeQueue.Count > 0 && packetsToSendThisIteration.Count < maxNumPacketsToSendPerIteration)
                     {
@@ -282,7 +290,13 @@ namespace Completed
 
                     while (packetsToSendThisIteration.Count > 0)
                     {
-                        NetworkPacket packet = packetsToSendThisIteration.Dequeue();                        
+                        PendingPacket pendingPacket = packetsToSendThisIteration.Dequeue();
+                        Debug.Assert(pendingPacket.recipient.GetClient() != null && pendingPacket.recipient.GetClient().Connected, "Trying to send packet to peer with no TcpClient");
+
+                        byte[] buffer;
+                        int bufferSize;
+                        pendingPacket.packet.GetBytes(out buffer, out bufferSize);
+                        pendingPacket.recipient.GetClient().GetStream().Write(buffer, 0, bufferSize);
                     }
                 }
             }
@@ -294,6 +308,21 @@ namespace Completed
             {
                 int peerIdx = peer.GetPeerId();
                 Debug.Log("Packet received from peer:" + peerIdx);
+
+                NetworkPacket packet = new NetworkPacket(buffer, size);
+
+                switch (packet.GetPacketType())
+                {
+                    case NetworkPacket.PacketType.INIT_PEER_DATA:
+                        string name = packet.ReadString();
+
+                        Debug.Log("Peer " + peer.GetPeerId() + " name recieved:" + name);
+                        peer.SetName(name);
+                        peer.SetState(NetworkPeer.PeerState.Joined);
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
@@ -301,7 +330,9 @@ namespace Completed
         {
             if (netState == NetState.Uninitialised)
             {
-                //NetworkPeer localPeer = AddPeer(playerName, true, false, null, NetworkPeer.PeerState.Joined);
+                NetworkPeer hostPeer = AddPeer("Host", false, true, null, NetworkPeer.PeerState.Joining);
+                NetworkPeer myPeer = AddPeer(playerName, true, false, null, NetworkPeer.PeerState.Joining);
+
                 ClientCreateSocket(ipAddress, GetHostPeer());
 
                 InitDataThread();
@@ -330,7 +361,7 @@ namespace Completed
         {
             netState = NetState.Joining;
 
-            NetworkPeer peer = GetMyPeer();
+            NetworkPeer peer = GetHostPeer();
             TcpClient tcpClient = peer.GetClient();
             IPAddress ipAddress = (IPAddress)data;
 
@@ -338,10 +369,10 @@ namespace Completed
 
             if (tcpClient.Connected)
             {
-                NetworkPeer hostPeer = AddPeer("Host...", false, true, tcpClient, NetworkPeer.PeerState.Joined);
+                GetMyPeer().SetState(NetworkPeer.PeerState.Joined);
                 netState = NetState.ActiveClient;
 
-                SendPeerData();                
+                SendPeerData(GetHostPeer());                
             }
             else
             {
@@ -365,21 +396,25 @@ namespace Completed
             numPeers = 0;
         }
 
-        void SendPeerData()
+        void SendPeerData(NetworkPeer toPeer)
         {
             NetworkPeer peer = GetMyPeer();
 
             NetworkPacket joinPacket = new NetworkPacket();
-            joinPacket.SetType(NetworkPacket.PacketType.PEER_DATA);
+            joinPacket.SetPacketType(NetworkPacket.PacketType.INIT_PEER_DATA);
             joinPacket.WriteString(peer.GetName());
 
-            AddPacketToQueue(joinPacket);
+            SendPacketToPeer(joinPacket, toPeer);
         }
 
-        void AddPacketToQueue(NetworkPacket packet)
+        void SendPacketToPeer(NetworkPacket packet, NetworkPeer peer)
         {
+            PendingPacket newPacket;
+            newPacket.packet = packet;
+            newPacket.recipient = peer;
+
             writeQueueMutex.WaitOne();
-            writeQueue.Enqueue(packet);
+            writeQueue.Enqueue(newPacket);
             writeQueueMutex.ReleaseMutex();
         }
 

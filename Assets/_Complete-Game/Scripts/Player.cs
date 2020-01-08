@@ -8,6 +8,13 @@ namespace Completed
 	//Player inherits from MovingObject, our base class for objects that can move, Enemy also inherits from this.
 	public class Player : MovingObject
 	{
+        public enum MovementDirection
+        {
+            none,
+            horizontal,
+            vertical
+        }
+
 		public float restartLevelDelay = 1f;		//Delay time in seconds to restart level.
 		public int pointsPerFood = 10;				//Number of points to add to player food points when picking up a food object.
 		public int pointsPerSoda = 20;				//Number of points to add to player food points when picking up a soda object.
@@ -76,19 +83,42 @@ namespace Completed
             }
 
             //If it's not the player's turn, exit the function.
-            if (!GameManager.instance.playersTurn) return;
+            if (GameManager.instance.playersTurn != playerId) return;
 			
 			int horizontal = 0;  	//Used to store the horizontal move direction.
-			int vertical = 0;		//Used to store the vertical move direction.
-			
-			//Check if we are running either in the Unity editor or in a standalone build.
+			int vertical = 0;       //Used to store the vertical move direction.
+
+            //Check if we are running either in the Unity editor or in a standalone build.
 #if UNITY_STANDALONE || UNITY_WEBPLAYER
-			
-			//Get input from the input manager, round it to an integer and store in horizontal to set x axis move direction
-			horizontal = (int) (Input.GetAxisRaw ("Horizontal"));
-			
-			//Get input from the input manager, round it to an integer and store in vertical to set y axis move direction
-			vertical = (int) (Input.GetAxisRaw ("Vertical"));
+
+            if (Local)
+            {
+                //Get input from the input manager, round it to an integer and store in horizontal to set x axis move direction
+                horizontal = (int)(Input.GetAxisRaw("Horizontal"));
+
+                //Get input from the input manager, round it to an integer and store in vertical to set y axis move direction
+                vertical = (int)(Input.GetAxisRaw("Vertical"));                
+            }
+            else if (NetworkManager.Instance.IsActive() && NetworkManager.Instance.IsHost())
+            {
+                NetworkPeer peer = NetworkManager.Instance.GetPeer(playerId);
+                MovementDirection requestedDirection = peer.GetRequestedMovement();
+
+                if (requestedDirection == MovementDirection.horizontal)
+                {
+                    horizontal = 1;
+                }
+                else if (requestedDirection == MovementDirection.vertical)
+                {
+                    vertical = 1;
+                } 
+                
+                // we read the requested mvoement now reset it
+                if (requestedDirection != MovementDirection.none)
+                {
+                    peer.SetRequestedMovement(MovementDirection.none);
+                }
+            }
 			
 			//Check if moving horizontally, if so set vertical to zero.
 			if(horizontal != 0)
@@ -138,6 +168,22 @@ namespace Completed
 			
 #endif //End of mobile platform dependendent compilation section started above with #elif
 			//Check if we have a non-zero value for horizontal or vertical
+
+            if (Local && NetworkManager.Instance.IsActive() && !NetworkManager.Instance.IsHost())
+            {
+                if (horizontal != 0)
+                {
+                    NetworkManager.Instance.SetRequestedInput(MovementDirection.horizontal);
+                }
+                else if (vertical != 0)
+                {
+                    NetworkManager.Instance.SetRequestedInput(MovementDirection.vertical);
+                }
+
+                // we're local but not host, clear inputs
+                horizontal = vertical = 0;
+            }
+
 			if(horizontal != 0 || vertical != 0)
 			{
 				//Call AttemptMove passing in the generic parameter Wall, since that is what Player may interact with if they encounter one (by attacking it)
@@ -174,9 +220,9 @@ namespace Completed
 			
 			//Since the player has moved and lost food points, check if the game has ended.
 			CheckIfGameOver ();
-			
-			//Set the playersTurn boolean of GameManager to false now that players turn is over.
-			GameManager.instance.playersTurn = false;
+
+            //Set the playersTurn boolean of GameManager to false now that players turn is over.
+            GameManager.instance.PlayerMoved(playerId);			
 		}
 		
 		

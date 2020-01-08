@@ -21,6 +21,8 @@ namespace Completed
         TcpClient client = null;
         PeerState state = PeerState.Uninitialised;
 
+        private Player.MovementDirection requestedMovement = Player.MovementDirection.none;
+
         public NetworkPeer(string name, int index, bool isLocal, bool isHost, TcpClient client, PeerState peerState)
         {
             peerName = name;
@@ -89,6 +91,16 @@ namespace Completed
         public PeerState GetState()
         {
             return state;
+        }
+
+        public Player.MovementDirection GetRequestedMovement()
+        {
+            return Player.MovementDirection.none;
+        }
+
+        public void SetRequestedMovement(Player.MovementDirection direction)
+        {
+            requestedMovement = direction;
         }
 
         // Start is called before the first frame update

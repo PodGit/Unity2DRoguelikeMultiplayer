@@ -12,10 +12,10 @@ namespace Completed
 		public float levelStartDelay = 2f;						//Time to wait before starting level, in seconds.
 		public float turnDelay = 0.1f;							//Delay between each Player turn.
 		public static GameManager instance = null;				//Static instance of GameManager which allows it to be accessed by any other script.
-		[HideInInspector] public bool playersTurn = true;		//Boolean to check if it's players turn, hidden in inspector but public.
-		
-		
-		private Text levelText;									//Text to display current level number.
+		[HideInInspector] public int playersTurn = 0;		    //Boolean to check if it's players turn, hidden in inspector but public.
+
+
+        private Text levelText;									//Text to display current level number.
 		private GameObject levelImage;							//Image to block out level as levels are being set up, background for levelText.
 		private BoardManager boardScript;						//Store a reference to our BoardManager which will set up the level.
 		private int level = 0;									//Current level number, expressed in game as "Day 1".
@@ -29,6 +29,7 @@ namespace Completed
         public int numPlayers { get; set; } = 1;
         private int[] playerFoodPoints;
         public GameObject PlayerPrefab;
+        private bool clientReadyToStart = false;
 
         //Awake is always called before any Start functions
         void Awake()
@@ -80,6 +81,11 @@ namespace Completed
 		//Initializes the game for each level.
 		void InitGame()
 		{
+            if (NetworkManager.Instance.IsActive())
+            {
+                numPlayers = NetworkManager.Instance.GetNumPeers();
+            }
+
 			//While doingSetup is true the player can't move, prevent player from moving while title card is up.
 			doingSetup = true;
 			
@@ -105,23 +111,26 @@ namespace Completed
 			boardScript.SetupScene(level);
 
             playerFoodPoints = new int[MaxNumPlayers];
-
             for (int playerIdx = 0; playerIdx < MaxNumPlayers; ++playerIdx)
             {
                 playerFoodPoints[playerIdx] = startFoodPoints;
+            }
 
-                // skip player 1 as it spawns with scene
-                if (playerIdx > 0 && playerIdx < GameManager.instance.numPlayers)
-                {
-                    Debug.Assert(PlayerPrefab != null, "Player prefab not set");
+            SpawnExtraPlayers();
+        }
 
-                    Vector3 spawnVector = new Vector3(playerIdx, 0, 0);
-                    GameObject spawnedObject = Instantiate(PlayerPrefab, spawnVector, Quaternion.identity);
-                    Player spawnedPlayer = spawnedObject.GetComponent<Player>();
+        void SpawnExtraPlayers()
+        {
+            for (int playerIdx = 0; playerIdx < numPlayers; ++playerIdx)
+            {
+                Debug.Assert(PlayerPrefab != null, "Player prefab not set");
 
-                    spawnedPlayer.Local = false;
-                    spawnedPlayer.playerId = playerIdx;
-                }
+                Vector3 spawnVector = new Vector3(playerIdx, 0, 0);
+                GameObject spawnedObject = Instantiate(PlayerPrefab, spawnVector, Quaternion.identity);
+                Player spawnedPlayer = spawnedObject.GetComponent<Player>();
+
+                spawnedPlayer.Local = false;
+                spawnedPlayer.playerId = playerIdx;
             }
         }
 
@@ -138,8 +147,14 @@ namespace Completed
 		//Update is called every frame.
 		void Update()
 		{
+            if (clientReadyToStart)
+            {
+                InitGame();
+                clientReadyToStart = false;
+            }
+
 			//Check that playersTurn or enemiesMoving or doingSetup are not currently true.
-			if(playersTurn || enemiesMoving || doingSetup)
+			if(playersTurn > -1 || enemiesMoving || doingSetup)
 				
 				//If any of these are true, return and do not start MoveEnemies.
 				return;
@@ -194,8 +209,8 @@ namespace Completed
 				//Wait for Enemy's moveTime before moving next Enemy, 
 				yield return new WaitForSeconds(enemies[i].moveTime);
 			}
-			//Once Enemies are done moving, set playersTurn to true so player can move.
-			playersTurn = true;
+			//Once Enemies are done moving, set playersTurn to 0 so player 0 can move.
+			playersTurn = 0;
 			
 			//Enemies are done moving, set enemiesMoving to false.
 			enemiesMoving = false;
@@ -216,6 +231,37 @@ namespace Completed
         public void SetPlayerFoodPoints(int playerId, int food)
         {
             playerFoodPoints[playerId] = food;
+        }
+
+        public void PlayerMoved(int playerId)
+        {
+            playersTurn++;
+
+            // if all players have moved set to -1
+            if (playersTurn >= numPlayers)
+            {
+                playersTurn = -1;
+            }
+
+            //if (NetworkManager.Instance.IsActive() && NetworkManager.Instance.IsHost())
+            //{
+            //    BroadcastGameState();
+            //}
+        }
+
+        public BoardManager GetBoardManager()
+        {
+            return boardScript;
+        }
+
+        public void SetLevel(int level)
+        {
+            this.level = level;
+        }
+
+        public void SetClientReadyToStart(bool ready)
+        {
+            clientReadyToStart = ready;
         }
     }
 }

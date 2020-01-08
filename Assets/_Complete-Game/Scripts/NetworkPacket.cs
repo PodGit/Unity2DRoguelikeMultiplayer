@@ -19,7 +19,9 @@ public class NetworkPacket
         JOIN_REQUEST,
         JOIN_ACKNOWLEDGE,
         INIT_PEER_DATA,
-        START_GAME
+        START_GAME,
+        INIT_BOARD,
+        MOVE_REQUEST
     }
 
     public enum DataType : byte
@@ -79,13 +81,39 @@ public class NetworkPacket
         IncreasePacketSize(1);
 
         byte[] bytes = BitConverter.GetBytes(inInt);
-        byte numBytes = (byte)bytes.Length;
+        byte numBytes = Convert.ToByte(bytes.Length);
 
         buffer[currentSize] = numBytes;
         IncreasePacketSize(1);
 
-        bytes.CopyTo(buffer, currentSize);
+        if (BitConverter.IsLittleEndian)
+            Array.Reverse(bytes);
+
+        Array.Copy(bytes, 0, buffer, currentSize, numBytes);
         IncreasePacketSize(numBytes);
+    }
+
+    public int ReadInt()
+    {
+        DataType dataType = (DataType)buffer[readOffset];
+        readOffset++;
+
+        Debug.Assert(dataType == DataType.INTEGER, "ReadInt: Data type wasn't integer");
+
+        int numBytes = (int)buffer[readOffset];
+        readOffset++;
+
+        Debug.Log("ReadInt numBytes:" + numBytes);
+
+        byte[] byteArray = new byte[4];
+        Array.Copy(buffer, readOffset, byteArray, 0, numBytes);
+
+        if (BitConverter.IsLittleEndian)
+            Array.Reverse(byteArray);
+
+        readOffset += numBytes;
+
+        return BitConverter.ToInt32(byteArray, 0);
     }
 
     public void WriteString(string inString)

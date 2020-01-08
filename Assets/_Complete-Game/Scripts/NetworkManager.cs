@@ -332,6 +332,38 @@ namespace Completed
                     case NetworkPacket.PacketType.START_GAME:
                         gameStarted = true;
                         break;
+                    case NetworkPacket.PacketType.MOVE_REQUEST:
+                        Debug.Assert(IsHost(), "Only host should recieve move requests");
+                        int direction = packet.ReadInt();
+
+                        peer.SetRequestedMovement((Player.MovementDirection)direction);
+                        break;
+                    case NetworkPacket.PacketType.INIT_BOARD:
+                        Debug.Assert(!IsHost(), "Only clients should recieve init boards");
+
+                        int level = packet.ReadInt();
+
+                        int numWallTiles = packet.ReadInt();
+                        BoardManager.PlacedObject[] wallTilePositions = new BoardManager.PlacedObject[numWallTiles];
+                        for (int wallTileIdx = 0; wallTileIdx < numWallTiles; ++wallTileIdx)
+                        {
+                            wallTilePositions[wallTileIdx].locationIndex = packet.ReadInt();
+                            wallTilePositions[wallTileIdx].tileIndex = packet.ReadInt();
+                        }
+
+                        int numFoodTiles = packet.ReadInt();
+                        BoardManager.PlacedObject[] foodTilePositions = new BoardManager.PlacedObject[numFoodTiles];
+                        for (int foodTileIdx = 0; foodTileIdx < numFoodTiles; ++foodTileIdx)
+                        {
+                            foodTilePositions[foodTileIdx].locationIndex = packet.ReadInt();
+                            foodTilePositions[foodTileIdx].tileIndex = packet.ReadInt();
+                        }
+
+                        GameManager.instance.GetBoardManager().InitBoard(wallTilePositions, foodTilePositions);
+                        GameManager.instance.SetLevel(level);
+                        GameManager.instance.SetClientReadyToStart(true);
+
+                        break;
                     default:
                         break;
                 }
@@ -429,6 +461,28 @@ namespace Completed
             SendPacketToPeer(startPacket, toPeer);
         }
 
+        public void SetRequestedInput(Player.MovementDirection direction)
+        {
+            SendRequestMove(GetHostPeer(), direction);
+        }
+
+        void SendRequestMove(NetworkPeer toPeer, Player.MovementDirection direction)
+        {
+            Debug.Assert(!IsHost(), "Host cant send move requests");
+
+            NetworkPeer myPeer = GetMyPeer();
+            if (direction != Player.MovementDirection.none && direction != myPeer.GetRequestedMovement())
+            {
+
+                NetworkPacket startPacket = new NetworkPacket();
+                startPacket.SetPacketType(NetworkPacket.PacketType.MOVE_REQUEST);
+                startPacket.WriteInt((int)direction);
+
+                myPeer.SetRequestedMovement(direction);
+                SendPacketToPeer(startPacket, toPeer);
+            }
+        }
+
         void SendPacketToPeer(NetworkPacket packet, NetworkPeer peer)
         {
             PendingPacket newPacket;
@@ -458,6 +512,86 @@ namespace Completed
         public bool GetGameStarted()
         {
             return gameStarted;
+        }
+
+        public void BroadcastBoardPositions()
+        {
+
+        }
+
+        public void BroadcastGameState()
+        {
+            Debug.Assert(IsHost(), "Only host should update gamestate");
+        }
+
+        public void BroadcastWallTiles(GameObject[] wallTiles)
+        {
+            Debug.Assert(IsHost(), "Only host can broadcast board pieces");
+
+
+        }
+
+        public void BroadcastRoundStart(int level, BoardManager.PlacedObject[] wallTiles, BoardManager.PlacedObject[] foodTiles)
+        {
+            Debug.Assert(IsHost(), "Only host can broadcast round start");
+
+            NetworkPacket packet = new NetworkPacket();
+            packet.SetPacketType(NetworkPacket.PacketType.INIT_BOARD);
+            packet.WriteInt(level);
+            packet.WriteInt(wallTiles.Length);
+            for (int wallTileIndex = 0; wallTileIndex < wallTiles.Length; ++wallTileIndex)
+            {
+                packet.WriteInt(wallTiles[wallTileIndex].locationIndex);
+                packet.WriteInt(wallTiles[wallTileIndex].tileIndex);
+            }
+            packet.WriteInt(foodTiles.Length);
+            for (int foodTileIndex = 0; foodTileIndex < foodTiles.Length; ++foodTileIndex)
+            {
+                packet.WriteInt(foodTiles[foodTileIndex].locationIndex);
+                packet.WriteInt(foodTiles[foodTileIndex].tileIndex);
+            }
+
+            for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
+            {
+                NetworkPeer peer = GetPeer(peerIdx);
+
+                if (!peer.IsLocal())
+                {
+                    SendPacketToPeer(packet, peer);
+                }
+            }
+
+#if true
+            byte[] testBuffer;
+            int testSize;
+            packet.GetBytes(out testBuffer, out testSize);
+            NetworkPacket testPacket = new NetworkPacket(testBuffer, testSize);
+            NetworkPacket.PacketType packetType = testPacket.GetPacketType();
+            int testLevel = testPacket.ReadInt();
+
+            int numWallTiles = testPacket.ReadInt();
+            BoardManager.PlacedObject[] wallTilePositions = new BoardManager.PlacedObject[numWallTiles];
+            for (int wallTileIdx = 0; wallTileIdx < numWallTiles; ++wallTileIdx)
+            {
+                wallTilePositions[wallTileIdx].locationIndex = testPacket.ReadInt();
+                wallTilePositions[wallTileIdx].tileIndex = testPacket.ReadInt();
+            }
+
+            int numFoodTiles = testPacket.ReadInt();
+            BoardManager.PlacedObject[] foodTilePositions = new BoardManager.PlacedObject[numFoodTiles];
+            for (int foodTileIdx = 0; foodTileIdx < numFoodTiles; ++foodTileIdx)
+            {
+                foodTilePositions[foodTileIdx].locationIndex = testPacket.ReadInt();
+                foodTilePositions[foodTileIdx].tileIndex = testPacket.ReadInt();
+            }
+
+            Debug.Log("dadwd");
+#endif
+        }
+
+        public void BroadcastFoodTiles(GameObject[] foodTiles)
+        {
+            Debug.Assert(IsHost(), "Only host can broadcast board pieces");
         }
 
         NetworkPeer GetMyPeer()

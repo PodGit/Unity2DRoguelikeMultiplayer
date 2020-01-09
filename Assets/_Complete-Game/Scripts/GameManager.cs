@@ -53,10 +53,7 @@ namespace Completed
 			enemies = new List<Enemy>();
 			
 			//Get a component reference to the attached BoardManager script
-			boardScript = GetComponent<BoardManager>();
-			
-			//Call the InitGame function to initialize the first level 
-			InitGame();
+			boardScript = GetComponent<BoardManager>();;
 		}
 
         //this is called only once, and the paramter tell it to be called only after the scene was loaded
@@ -106,9 +103,9 @@ namespace Completed
 			
 			//Clear any Enemy objects in our List to prepare for next level.
 			enemies.Clear();
-			
-			//Call the SetupScene function of the BoardManager script, pass it current level number.
-			boardScript.SetupScene(level);
+
+            //Call the SetupScene function of the BoardManager script, pass it current level number.
+            boardScript.SetupScene(level);
 
             playerFoodPoints = new int[MaxNumPlayers];
             for (int playerIdx = 0; playerIdx < MaxNumPlayers; ++playerIdx)

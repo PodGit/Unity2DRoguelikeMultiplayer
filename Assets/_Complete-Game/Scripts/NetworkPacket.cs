@@ -86,8 +86,8 @@ public class NetworkPacket
         buffer[currentSize] = numBytes;
         IncreasePacketSize(1);
 
-        if (BitConverter.IsLittleEndian)
-            Array.Reverse(bytes);
+        //if (BitConverter.IsLittleEndian)
+        //    Array.Reverse(bytes);
 
         Array.Copy(bytes, 0, buffer, currentSize, numBytes);
         IncreasePacketSize(numBytes);
@@ -100,16 +100,15 @@ public class NetworkPacket
 
         Debug.Assert(dataType == DataType.INTEGER, "ReadInt: Data type wasn't integer");
 
-        int numBytes = (int)buffer[readOffset];
+        
+        int numBytes = Convert.ToInt32(buffer[readOffset]);
         readOffset++;
 
-        Debug.Log("ReadInt numBytes:" + numBytes);
-
-        byte[] byteArray = new byte[4];
+        byte[] byteArray = new byte[numBytes];
         Array.Copy(buffer, readOffset, byteArray, 0, numBytes);
 
-        if (BitConverter.IsLittleEndian)
-            Array.Reverse(byteArray);
+        //if (BitConverter.IsLittleEndian)
+        //    Array.Reverse(byteArray);
 
         readOffset += numBytes;
 

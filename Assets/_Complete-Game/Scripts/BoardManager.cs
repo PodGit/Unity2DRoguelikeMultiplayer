@@ -73,6 +73,8 @@ namespace Completed
         {
             if (boardPendingInitialisation)
             {
+                InitialiseList();
+
                 for (int wallTileIndex = 0; wallTileIndex < pendingWallTiles.Length; wallTileIndex++)
                 {
                     PlacedObject placedObject = pendingWallTiles[wallTileIndex];
@@ -148,28 +150,33 @@ namespace Completed
 			//Choose a random number of objects to instantiate within the minimum and maximum limits
 			int objectCount = Random.Range (minimum, maximum+1);
 
-            PlacedObject[] objectLocationIndices = new PlacedObject[objectCount];
-			
-			//Instantiate objects until the randomly chosen limit objectCount is reached
-			for(int i = 0; i < objectCount; i++)
-			{
-                int index = 0;
+            if (objectCount > 0)
+            {
+                PlacedObject[] objectLocationIndices = new PlacedObject[objectCount];
 
-				//Choose a position for randomPosition by getting a random position from our list of available Vector3s stored in gridPosition
-				Vector3 randomPosition = RandomPosition(out index);
+                //Instantiate objects until the randomly chosen limit objectCount is reached
+                for (int i = 0; i < objectCount; i++)
+                {
+                    int index = 0;
 
-                //Choose a random tile from tileArray and assign it to tileChoice
-                int tileIndex = Random.Range(0, tileArray.Length);
-                GameObject tileChoice = tileArray[tileIndex];
+                    //Choose a position for randomPosition by getting a random position from our list of available Vector3s stored in gridPosition
+                    Vector3 randomPosition = RandomPosition(out index);
 
-                //Instantiate tileChoice at the position returned by RandomPosition with no change in rotation
-                Instantiate(tileChoice, randomPosition, Quaternion.identity);
+                    //Choose a random tile from tileArray and assign it to tileChoice
+                    int tileIndex = Random.Range(0, tileArray.Length);
+                    GameObject tileChoice = tileArray[tileIndex];
 
-                objectLocationIndices[i].locationIndex = index;
-                objectLocationIndices[i].tileIndex = tileIndex;
+                    //Instantiate tileChoice at the position returned by RandomPosition with no change in rotation
+                    Instantiate(tileChoice, randomPosition, Quaternion.identity);
+
+                    objectLocationIndices[i].locationIndex = index;
+                    objectLocationIndices[i].tileIndex = tileIndex;
+                }
+
+                return objectLocationIndices;
             }
 
-            return objectLocationIndices;
+            return null;
 		}
 		
 		//SetupScene initializes our level and calls the previous functions to lay out the game board
@@ -231,6 +238,7 @@ namespace Completed
         void PlaceObject(GameObject[] objectList, PlacedObject placedObject)
         {
             Vector3 position = gridPositions[placedObject.locationIndex];
+            gridPositions.RemoveAt(placedObject.locationIndex);
 
             GameObject tileChoice = objectList[placedObject.tileIndex];
 

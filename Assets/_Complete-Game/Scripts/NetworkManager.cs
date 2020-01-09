@@ -342,27 +342,33 @@ namespace Completed
                         Debug.Assert(!IsHost(), "Only clients should recieve init boards");
 
                         int level = packet.ReadInt();
+                        Debug.Log("Level: " + level);
 
                         int numWallTiles = packet.ReadInt();
+                        Debug.Log("Num Wall tiles: " + numWallTiles);
+
                         BoardManager.PlacedObject[] wallTilePositions = new BoardManager.PlacedObject[numWallTiles];
                         for (int wallTileIdx = 0; wallTileIdx < numWallTiles; ++wallTileIdx)
                         {
                             wallTilePositions[wallTileIdx].locationIndex = packet.ReadInt();
                             wallTilePositions[wallTileIdx].tileIndex = packet.ReadInt();
+                            Debug.Log("Wall tile[" + wallTileIdx + "]: LocationIdnex: " + wallTilePositions[wallTileIdx].locationIndex + "  tileIndex: " + wallTilePositions[wallTileIdx].tileIndex);
                         }
 
                         int numFoodTiles = packet.ReadInt();
+                        Debug.Log("Num food tiles: " + numFoodTiles);
+
                         BoardManager.PlacedObject[] foodTilePositions = new BoardManager.PlacedObject[numFoodTiles];
                         for (int foodTileIdx = 0; foodTileIdx < numFoodTiles; ++foodTileIdx)
                         {
                             foodTilePositions[foodTileIdx].locationIndex = packet.ReadInt();
                             foodTilePositions[foodTileIdx].tileIndex = packet.ReadInt();
+                            Debug.Log("Wall tile[" + foodTileIdx + "]: LocationIdnex: " + foodTilePositions[foodTileIdx].locationIndex + "  tileIndex: " + foodTilePositions[foodTileIdx].tileIndex);
                         }
 
                         GameManager.instance.GetBoardManager().InitBoard(wallTilePositions, foodTilePositions);
                         GameManager.instance.SetLevel(level);
                         GameManager.instance.SetClientReadyToStart(true);
-
                         break;
                     default:
                         break;
@@ -534,21 +540,31 @@ namespace Completed
         public void BroadcastRoundStart(int level, BoardManager.PlacedObject[] wallTiles, BoardManager.PlacedObject[] foodTiles)
         {
             Debug.Assert(IsHost(), "Only host can broadcast round start");
+            Debug.Log("BroadcastRoundStart begin");
 
             NetworkPacket packet = new NetworkPacket();
             packet.SetPacketType(NetworkPacket.PacketType.INIT_BOARD);
             packet.WriteInt(level);
+            Debug.Log("Level: " + level);
+
             packet.WriteInt(wallTiles.Length);
+            Debug.Log("Num wall tiles: " + wallTiles.Length);
+
             for (int wallTileIndex = 0; wallTileIndex < wallTiles.Length; ++wallTileIndex)
             {
                 packet.WriteInt(wallTiles[wallTileIndex].locationIndex);
                 packet.WriteInt(wallTiles[wallTileIndex].tileIndex);
+                Debug.Log("Wall tile[" + wallTileIndex + "]: LocationIdnex: " + wallTiles[wallTileIndex].locationIndex + "  tileIndex: " + wallTiles[wallTileIndex].tileIndex);
             }
+
             packet.WriteInt(foodTiles.Length);
+            Debug.Log("Num wall tiles: " + foodTiles.Length);
+
             for (int foodTileIndex = 0; foodTileIndex < foodTiles.Length; ++foodTileIndex)
             {
                 packet.WriteInt(foodTiles[foodTileIndex].locationIndex);
                 packet.WriteInt(foodTiles[foodTileIndex].tileIndex);
+                Debug.Log("Floor tile[" + foodTileIndex + "]: LocationIdnex: " + foodTiles[foodTileIndex].locationIndex + "  tileIndex: " + foodTiles[foodTileIndex].tileIndex);
             }
 
             for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
@@ -561,7 +577,7 @@ namespace Completed
                 }
             }
 
-#if true
+#if false
             byte[] testBuffer;
             int testSize;
             packet.GetBytes(out testBuffer, out testSize);
@@ -584,8 +600,6 @@ namespace Completed
                 foodTilePositions[foodTileIdx].locationIndex = testPacket.ReadInt();
                 foodTilePositions[foodTileIdx].tileIndex = testPacket.ReadInt();
             }
-
-            Debug.Log("dadwd");
 #endif
         }
 

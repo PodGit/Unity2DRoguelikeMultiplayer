@@ -31,6 +31,14 @@ namespace Completed
             public int locationIndex;
             public int tileIndex;
         }
+
+        enum PlacedObjectType
+        {
+            wall,
+            food,
+            enemy,
+            MAX
+        }
 		
 		public int columns = 8; 										//Number of columns in our game board.
 		public int rows = 8;											//Number of rows in our game board.
@@ -48,8 +56,7 @@ namespace Completed
 
         // Network
         bool boardPendingInitialisation = false;
-        PlacedObject[] pendingWallTiles;
-        PlacedObject[] pendingFoodTiles;
+        PlacedObject[][] pendingTiles = new PlacedObject[(int)PlacedObjectType.MAX][];
 
         //Clears our list gridPositions and prepares it to generate a new board.
         void InitialiseList ()
@@ -75,21 +82,36 @@ namespace Completed
             {
                 InitialiseList();
 
-                for (int wallTileIndex = 0; wallTileIndex < pendingWallTiles.Length; wallTileIndex++)
+                for (int objectType = 0; objectType < (int)PlacedObjectType.MAX; ++objectType)
                 {
-                    PlacedObject placedObject = pendingWallTiles[wallTileIndex];
+                    for (int index = 0; index < pendingTiles[objectType].Length; index++)
+                    {
+                        PlacedObject placedObject = pendingTiles[objectType][index];
 
-                    PlaceObject(wallTiles, placedObject);
-                }
-                pendingWallTiles = null;
+                        GameObject[] chosenObjects = null;
 
-                for (int foodTileIndex = 0; foodTileIndex < pendingFoodTiles.Length; foodTileIndex++)
-                {
-                    PlacedObject placedObject = pendingFoodTiles[foodTileIndex];
+                        switch (objectType)
+                        {
+                            case (int)PlacedObjectType.wall:
+                                chosenObjects = wallTiles;
+                                break;
+                            case (int)PlacedObjectType.food:
+                                chosenObjects = foodTiles;
+                                break;
+                            case (int)PlacedObjectType.enemy:
+                                chosenObjects = enemyTiles;
+                                break;
+                            default:
+                                break;
+                        }
 
-                    PlaceObject(foodTiles, placedObject);
-                }
-                pendingFoodTiles = null;
+                        Debug.Assert(chosenObjects != null, "Couldn't find prefabs for selected object");
+
+                        PlaceObject(chosenObjects, placedObject);
+                    }
+
+                    pendingTiles[objectType] = null;
+                }                
 
                 boardPendingInitialisation = false;
             }
@@ -194,43 +216,44 @@ namespace Completed
 
             if (networkActive)
             {
-                numPlayers = NetworkManager.Instance.GetNumPeers();
-
-                if (!NetworkManager.Instance.IsHost())
-                {
-                    Debug.Log("SetupScene exiting early, waiting for host to send board locations");
-                    return;
-                }
+                numPlayers = NetworkManager.Instance.GetNumPeers();                
             }
-			
-			//Instantiate a random number of wall tiles based on minimum and maximum, at randomized positions.
-			PlacedObject[] wallPositions = LayoutObjectAtRandom (wallTiles, wallCount.minimum, wallCount.maximum);
-
-			//Instantiate a random number of food tiles based on minimum and maximum, at randomized positions.
-			PlacedObject[] foodPositions = LayoutObjectAtRandom (foodTiles, foodCount.minimum, foodCount.maximum);
-			
-			//Determine number of enemies based on current level number, based on a logarithmic progression
-			int enemyCount = (int)Mathf.Log(level, 2f);
-			
-			//Instantiate a random number of enemies based on minimum and maximum, at randomized positions.
-			LayoutObjectAtRandom (enemyTiles, enemyCount, enemyCount);
 
             for (int playerNum = 0; playerNum < numPlayers; ++playerNum)
             {
                 //Instantiate the exit tile in the upper right hand corner of our game board
                 Instantiate(exit, new Vector3(columns - 1 - playerNum, rows - 1, 0f), Quaternion.identity);
             }
+
+            if (networkActive && !NetworkManager.Instance.IsHost())
+            {
+                Debug.Log("SetupScene exiting early, waiting for host to send board locations");
+                return;
+            }
+
+            //Instantiate a random number of wall tiles based on minimum and maximum, at randomized positions.
+            PlacedObject[] wallPositions = LayoutObjectAtRandom (wallTiles, wallCount.minimum, wallCount.maximum);
+
+			//Instantiate a random number of food tiles based on minimum and maximum, at randomized positions.
+			PlacedObject[] foodPositions = LayoutObjectAtRandom (foodTiles, foodCount.minimum, foodCount.maximum);
+			
+			//Determine number of enemies based on current level number, based on a logarithmic progression
+			int enemyCount = (int)Mathf.Log(level, 2f);
+
+            //Instantiate a random number of enemies based on minimum and maximum, at randomized positions.
+            PlacedObject[] enemyPositions = LayoutObjectAtRandom(enemyTiles, enemyCount, enemyCount);            
             
             if (networkActive)
             {
-                NetworkManager.Instance.BroadcastRoundStart(level, wallPositions, foodPositions);
+                NetworkManager.Instance.BroadcastRoundStart(level, wallPositions, foodPositions, enemyPositions);
             }
         }
 
-        public void InitBoard(PlacedObject[] wallTilesToAdd, PlacedObject[] foodTilesToAdd)
+        public void InitBoard(PlacedObject[] wallTilesToAdd, PlacedObject[] foodTilesToAdd, PlacedObject[] enemyTilesToadd)
         {
-            pendingWallTiles = wallTilesToAdd;
-            pendingFoodTiles = foodTilesToAdd;
+            pendingTiles[(int)PlacedObjectType.wall] = wallTilesToAdd;
+            pendingTiles[(int)PlacedObjectType.food] = foodTilesToAdd;
+            pendingTiles[(int)PlacedObjectType.enemy] = enemyTilesToadd;
 
             boardPendingInitialisation = true;
         }

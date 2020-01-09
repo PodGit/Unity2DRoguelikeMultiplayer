@@ -341,39 +341,55 @@ namespace Completed
                     case NetworkPacket.PacketType.INIT_BOARD:
                         Debug.Assert(!IsHost(), "Only clients should recieve init boards");
 
-                        int level = packet.ReadInt();
-                        Debug.Log("Level: " + level);
-
-                        int numWallTiles = packet.ReadInt();
-                        Debug.Log("Num Wall tiles: " + numWallTiles);
-
-                        BoardManager.PlacedObject[] wallTilePositions = new BoardManager.PlacedObject[numWallTiles];
-                        for (int wallTileIdx = 0; wallTileIdx < numWallTiles; ++wallTileIdx)
-                        {
-                            wallTilePositions[wallTileIdx].locationIndex = packet.ReadInt();
-                            wallTilePositions[wallTileIdx].tileIndex = packet.ReadInt();
-                            Debug.Log("Wall tile[" + wallTileIdx + "]: LocationIdnex: " + wallTilePositions[wallTileIdx].locationIndex + "  tileIndex: " + wallTilePositions[wallTileIdx].tileIndex);
-                        }
-
-                        int numFoodTiles = packet.ReadInt();
-                        Debug.Log("Num food tiles: " + numFoodTiles);
-
-                        BoardManager.PlacedObject[] foodTilePositions = new BoardManager.PlacedObject[numFoodTiles];
-                        for (int foodTileIdx = 0; foodTileIdx < numFoodTiles; ++foodTileIdx)
-                        {
-                            foodTilePositions[foodTileIdx].locationIndex = packet.ReadInt();
-                            foodTilePositions[foodTileIdx].tileIndex = packet.ReadInt();
-                            Debug.Log("Wall tile[" + foodTileIdx + "]: LocationIdnex: " + foodTilePositions[foodTileIdx].locationIndex + "  tileIndex: " + foodTilePositions[foodTileIdx].tileIndex);
-                        }
-
-                        GameManager.instance.GetBoardManager().InitBoard(wallTilePositions, foodTilePositions);
-                        GameManager.instance.SetLevel(level);
-                        GameManager.instance.SetClientReadyToStart(true);
+                        ReadPacketInitBoard(packet);                        
                         break;
                     default:
                         break;
                 }
             }
+        }
+
+        void ReadPacketInitBoard(NetworkPacket packet)
+        {
+            int level = packet.ReadInt();
+            Debug.Log("Level: " + level);
+
+            int numWallTiles = packet.ReadInt();
+            Debug.Log("Num Wall tiles: " + numWallTiles);
+
+            BoardManager.PlacedObject[] wallTilePositions = new BoardManager.PlacedObject[numWallTiles];
+            for (int wallTileIdx = 0; wallTileIdx < numWallTiles; ++wallTileIdx)
+            {
+                wallTilePositions[wallTileIdx].locationIndex = packet.ReadInt();
+                wallTilePositions[wallTileIdx].tileIndex = packet.ReadInt();
+                Debug.Log("Wall tile[" + wallTileIdx + "]: LocationIdnex: " + wallTilePositions[wallTileIdx].locationIndex + "  tileIndex: " + wallTilePositions[wallTileIdx].tileIndex);
+            }
+
+            int numFoodTiles = packet.ReadInt();
+            Debug.Log("Num food tiles: " + numFoodTiles);
+
+            BoardManager.PlacedObject[] foodTilePositions = new BoardManager.PlacedObject[numFoodTiles];
+            for (int foodTileIdx = 0; foodTileIdx < numFoodTiles; ++foodTileIdx)
+            {
+                foodTilePositions[foodTileIdx].locationIndex = packet.ReadInt();
+                foodTilePositions[foodTileIdx].tileIndex = packet.ReadInt();
+                Debug.Log("Food tile[" + foodTileIdx + "]: LocationIdnex: " + foodTilePositions[foodTileIdx].locationIndex + "  tileIndex: " + foodTilePositions[foodTileIdx].tileIndex);
+            }
+
+            int numEnemyTiles = packet.ReadInt();
+            Debug.Log("Num enemy tiles: " + numEnemyTiles);
+
+            BoardManager.PlacedObject[] enemyTilePositions = new BoardManager.PlacedObject[numEnemyTiles];
+            for (int enemyTileIdx = 0; enemyTileIdx < numEnemyTiles; ++enemyTileIdx)
+            {
+                enemyTilePositions[enemyTileIdx].locationIndex = packet.ReadInt();
+                enemyTilePositions[enemyTileIdx].tileIndex = packet.ReadInt();
+                Debug.Log("Enemy tile[" + enemyTileIdx + "]: LocationIdnex: " + enemyTilePositions[enemyTileIdx].locationIndex + "  tileIndex: " + enemyTilePositions[enemyTileIdx].tileIndex);
+            }
+
+            GameManager.instance.GetBoardManager().InitBoard(wallTilePositions, foodTilePositions, enemyTilePositions);
+            GameManager.instance.SetLevel(level);
+            GameManager.instance.SetClientReadyToStart(true);
         }
 
         public void Join(string ipAddress, string playerName)
@@ -537,7 +553,7 @@ namespace Completed
 
         }
 
-        public void BroadcastRoundStart(int level, BoardManager.PlacedObject[] wallTiles, BoardManager.PlacedObject[] foodTiles)
+        public void BroadcastRoundStart(int level, BoardManager.PlacedObject[] wallTiles, BoardManager.PlacedObject[] foodTiles, BoardManager.PlacedObject[] enemyTiles)
         {
             Debug.Assert(IsHost(), "Only host can broadcast round start");
             Debug.Log("BroadcastRoundStart begin");
@@ -567,6 +583,17 @@ namespace Completed
                 Debug.Log("Floor tile[" + foodTileIndex + "]: LocationIdnex: " + foodTiles[foodTileIndex].locationIndex + "  tileIndex: " + foodTiles[foodTileIndex].tileIndex);
             }
 
+            int numEnemies = enemyTiles != null ? enemyTiles.Length : 0 ;
+            packet.WriteInt(numEnemies);
+            Debug.Log("Num enemy tiles: " + numEnemies);
+
+            for (int enemyTileIndex = 0; enemyTileIndex < numEnemies; ++enemyTileIndex)
+            {
+                packet.WriteInt(enemyTiles[enemyTileIndex].locationIndex);
+                packet.WriteInt(enemyTiles[enemyTileIndex].tileIndex);
+                Debug.Log("Enemy tile[" + enemyTileIndex + "]: LocationIdnex: " + enemyTiles[enemyTileIndex].locationIndex + "  tileIndex: " + enemyTiles[enemyTileIndex].tileIndex);
+            }
+
             for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
             {
                 NetworkPeer peer = GetPeer(peerIdx);
@@ -576,31 +603,6 @@ namespace Completed
                     SendPacketToPeer(packet, peer);
                 }
             }
-
-#if false
-            byte[] testBuffer;
-            int testSize;
-            packet.GetBytes(out testBuffer, out testSize);
-            NetworkPacket testPacket = new NetworkPacket(testBuffer, testSize);
-            NetworkPacket.PacketType packetType = testPacket.GetPacketType();
-            int testLevel = testPacket.ReadInt();
-
-            int numWallTiles = testPacket.ReadInt();
-            BoardManager.PlacedObject[] wallTilePositions = new BoardManager.PlacedObject[numWallTiles];
-            for (int wallTileIdx = 0; wallTileIdx < numWallTiles; ++wallTileIdx)
-            {
-                wallTilePositions[wallTileIdx].locationIndex = testPacket.ReadInt();
-                wallTilePositions[wallTileIdx].tileIndex = testPacket.ReadInt();
-            }
-
-            int numFoodTiles = testPacket.ReadInt();
-            BoardManager.PlacedObject[] foodTilePositions = new BoardManager.PlacedObject[numFoodTiles];
-            for (int foodTileIdx = 0; foodTileIdx < numFoodTiles; ++foodTileIdx)
-            {
-                foodTilePositions[foodTileIdx].locationIndex = testPacket.ReadInt();
-                foodTilePositions[foodTileIdx].tileIndex = testPacket.ReadInt();
-            }
-#endif
         }
 
         public void BroadcastFoodTiles(GameObject[] foodTiles)

@@ -78,6 +78,8 @@ namespace Completed
 		//Initializes the game for each level.
 		void InitGame()
 		{
+            playersTurn = 0;
+
             if (NetworkManager.Instance.IsActive())
             {
                 numPlayers = NetworkManager.Instance.GetNumPeers();
@@ -118,7 +120,7 @@ namespace Completed
 
         void SpawnExtraPlayers()
         {
-            for (int playerIdx = 0; playerIdx < numPlayers; ++playerIdx)
+            for (int playerIdx = 1; playerIdx < numPlayers; ++playerIdx)
             {
                 Debug.Assert(PlayerPrefab != null, "Player prefab not set");
 

@@ -10,43 +10,43 @@ Add game rules to account for having more than one player
 Modify game AI to fairly pursue each player
 
 Current State:
- _ Game rules/flow
+ - Game rules/flow
   - I don't know the intended game flow but I opted for adding a new player turn for each connected client. Clients can't collide and therefore there is a different exit tile for each player
- _ Added Main Menu
+ - Added Main Menu
   - Solo: Launch one player local game as in the tutorial
   - Host: Create server TcpListener and move to new Lobby scene
   - Join: Create TcpClient and attempt to connect to i.p specified in ip test field and move to lobby scene
   - Player name: player name to use when connecting
- _ Added Lobby Scene
+ - Added Lobby Scene
   - Shows connected client and for the host a "start game" button which takes all client to the game scene
- _ Added Network Classes
-  _ Network Manager
+ - Added Network Classes
+  - Network Manager
     - Create TcpListeners for hosts and TcpClients for clients, creates connection and data threads and manages a list of connected peers
 	- Connection thread listens for new connections and creates a new peer for each incoming connection
 	- Data thread takes packets from a queue and sends them to the specified clients
-  _ Network Peer
+  - Network Peer
 	- Manages state of a connected client
 	- Stores pending packet information e.g. requested movements and client info (connected state, name etc.)
-  _ Network Packet
+  - Network Packet
     - Stores information to be sent across a network
 	- Contains functions for writing multiple integer and string values and parsing functions to extract this information after recieving them
 	- Has multiple packet types allowing specifying of multiple formats of data (e.g. a PLAYER_MOVE packet has an playerId, x directions and y direction)
-  _Modified BoardManager
+  - Modified BoardManager
     - Objects are now only placed by the host and have their positions broadcast to clients to replicate
-  _Modified Player
+  - Modified Player
     - Player movements for clients are now sent to host and not actioned until acknowledged by the host
-  _Modified Enemy
+  - Modified Enemy
     - Before moving each frame enemies attempt to target the closest player
-  _Modified GameManager
+  - Modified GameManager
     - Added logic to have multiple player turns
 	- Added combined "food" levels for a joint score
 	- Game flow deferred at multiple points for clients waiting for signal from host to do them
 
 Known Issues:
- _ UI
+ - UI
    - The UI in the pre game states is very hacked in order to allow the basic operation of joining and hosting
    - Resizing windows messes up UI as it was made for a certain viewport
- _ Error handling
+ - Error handling
    - UI doesn't present all network errors e.g. when joining the socket is already in use (due to other app or previous recent game crash (takes windows 2 mins to release socket))
- _ Design problems
+ - Design problems
    - We don't handle some weirdness with design e.g. one player is on an exit tile still has to make a move to progress their turn to the next player

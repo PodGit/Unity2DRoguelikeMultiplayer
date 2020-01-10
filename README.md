@@ -11,14 +11,14 @@ Modify game AI to fairly pursue each player
 
 Current State:
  - Game rules/flow
-  - I don't know the intended game flow but I opted for adding a new player turn for each connected client. Clients can't collide and therefore there is a different exit tile for each player
+   - I don't know the intended game flow but I opted for adding a new player turn for each connected client. Clients can't collide and therefore there is a different exit tile for each player
  - Added Main Menu
-  - Solo: Launch one player local game as in the tutorial
-  - Host: Create server TcpListener and move to new Lobby scene
-  - Join: Create TcpClient and attempt to connect to i.p specified in ip test field and move to lobby scene
-  - Player name: player name to use when connecting
+   - Solo: Launch one player local game as in the tutorial
+   - Host: Create server TcpListener and move to new Lobby scene
+   - Join: Create TcpClient and attempt to connect to i.p specified in ip test field and move to lobby scene
+   - Player name: player name to use when connecting
  - Added Lobby Scene
-  - Shows connected client and for the host a "start game" button which takes all client to the game scene
+   - Shows connected client and for the host a "start game" button which takes all client to the game scene
  - Added Network Classes
   - Network Manager
     - Create TcpListeners for hosts and TcpClients for clients, creates connection and data threads and manages a list of connected peers

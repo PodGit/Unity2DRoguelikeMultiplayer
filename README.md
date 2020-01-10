@@ -9,6 +9,13 @@ Allow connection/data transmission on a separate thread to prevent locking the g
 Add game rules to account for having more than one player
 Modify game AI to fairly pursue each player
 
+Running Instructions:
+ - Clone repository
+ - Go to Builds/
+ - Run .exe and click host
+ - Run .exe, enter i.p of host computer and click join (if this fails you may need to wait 2 minutes for windows to release a lingering closed socket, sometimes from a previous killed game isntance (solution is use a range of ports))
+ - When both are in lobby, host click 'start game'
+
 Current State:
  - Game rules/flow
    - I don't know the intended game flow but I opted for adding a new player turn for each connected client. Clients can't collide and therefore there is a different exit tile for each player

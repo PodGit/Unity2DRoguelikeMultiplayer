@@ -4,11 +4,18 @@ using System.Collections;
 
 namespace Completed
 {
-	using System.Collections.Generic;		//Allows us to use Lists. 
-	using UnityEngine.UI;					//Allows us to use UI.
+	using System.Collections.Generic;       //Allows us to use Lists. 
+    using System.Threading;
+    using UnityEngine.UI;					//Allows us to use UI.
 	
 	public class GameManager : MonoBehaviour
 	{
+        struct PendingMove
+        {
+            public int playerId;
+            public Vector3 movement;
+        }
+
 		public float levelStartDelay = 2f;						//Time to wait before starting level, in seconds.
 		public float turnDelay = 0.1f;							//Delay between each Player turn.
 		public static GameManager instance = null;				//Static instance of GameManager which allows it to be accessed by any other script.
@@ -31,8 +38,15 @@ namespace Completed
         public int numPlayers { get; set; } = 1;
         private int[] playerFoodPoints;
         private bool clientReadyToStart = false;
-        private Vector3[] pendingPlayerPositions;
-        private int[] pendingFoodPositions;
+
+        private Mutex pendingMovementMutex;
+        private Queue<PendingMove> pendingMovements;
+
+        GameManager()
+        {
+            pendingMovements = new Queue<PendingMove>();
+            pendingMovementMutex = new Mutex();
+        }
 
         //Awake is always called before any Start functions
         void Awake()
@@ -169,14 +183,25 @@ namespace Completed
                 clientReadyToStart = false;
             }
 
-            if (pendingPlayerPositions != null)
-            {
-                UpdatePlayerPositions();
 
-                SetNextPlayersTurn();
-                pendingPlayerPositions = null;
-                pendingFoodPositions = null;
+            pendingMovementMutex.WaitOne();
+            while (pendingMovements.Count > 0)
+            {
+                PendingMove move = pendingMovements.Dequeue();
+                Player player = players[move.playerId].GetComponent<Player>();
+
+                if (NetworkManager.Instance.IsActive())
+                {
+                    NetworkPeer peer = NetworkManager.Instance.GetPeer(move.playerId);
+                    peer.SetRequestedMovement(Player.MovementDirection.none);
+                }
+
+                Vector3 position = player.transform.position;
+                player.RemoteMove((int)move.movement.x, (int)move.movement.y);
+
+                SetNextPlayersTurn();                
             }
+            pendingMovementMutex.ReleaseMutex();
 
 			//Check that playersTurn or enemiesMoving or doingSetup are not currently true.
 			if(playersTurn > -1 || enemiesMoving || doingSetup)
@@ -243,14 +268,16 @@ namespace Completed
 
         public int GetTotalCurrentFoodPoints()
         {
-            int currentPoints = 0;
+            int currentFood = 0;
 
-            for (int playerIdx = 0; playerIdx < numPlayers; playerIdx++)
+            Player[] players = GameObject.FindObjectsOfType<Player>();
+
+            for (int playerIdx = 0; playerIdx < players.Length; playerIdx++)
             {
-                currentPoints += playerFoodPoints[playerIdx];
+                currentFood += players[playerIdx].GetFood();
             }
 
-            return currentPoints;
+            return currentFood;
         }
 
         public int GetCurrentFoodPoints(int playerId)
@@ -269,20 +296,11 @@ namespace Completed
 
             if (NetworkManager.Instance.IsActive() && NetworkManager.Instance.IsHost())
             {
-                Vector3[] playerPositions = new Vector3[numPlayers];
-                for (int playerIdx = 0; playerIdx < numPlayers; ++playerIdx)
-                {
-                    Vector3 newPosition = players[playerIdx].transform.position;
-                    if (playerId == playerIdx)
-                    {
-                        newPosition.x += xDir;
-                        newPosition.y += yDir;
-                    }
-                    playerPositions[playerIdx] = newPosition;
-                    
-                }
+                Vector3 move = new Vector3();
+                move.x = xDir;
+                move.y = yDir;
 
-                NetworkManager.Instance.BroadcastPlayerStates(playerPositions, playerFoodPoints);
+                NetworkManager.Instance.BroadcastPlayerMove(playerId, move);
             }
         }
 
@@ -312,32 +330,14 @@ namespace Completed
             clientReadyToStart = ready;
         }
 
-        public void RecievedPlayerStates(Vector3[] playerPositions, int[] playerFoodPoints)
+        public void RecievedPlayerMove(int playerId, Vector3 move)
         {
-            pendingPlayerPositions = playerPositions;
-            pendingFoodPositions = playerFoodPoints;
-        }
-
-        void UpdatePlayerPositions()
-        {
-            for (int playerIdx = 0; playerIdx < pendingPlayerPositions.Length; ++playerIdx)
-            {
-                playerFoodPoints[playerIdx] = pendingFoodPositions[playerIdx];
-                int newX = (int)pendingPlayerPositions[playerIdx].x;
-                int newY = (int)pendingPlayerPositions[playerIdx].y;
-
-                GameObject playerObject = players[playerIdx];
-                Player player = playerObject.GetComponent<Player>();
-
-                if (NetworkManager.Instance.IsActive())
-                {
-                    NetworkPeer peer = NetworkManager.Instance.GetPeer(playerIdx);
-                    peer.SetRequestedMovement(Player.MovementDirection.none);
-                }
-
-                Vector3 position = player.transform.position;
-                player.RemoteMove(newX - (int)position.x, newY - (int)position.y);
-            }
+            pendingMovementMutex.WaitOne();
+            PendingMove pendingMove;
+            pendingMove.playerId = playerId;
+            pendingMove.movement = move;
+            pendingMovements.Enqueue(pendingMove);
+            pendingMovementMutex.ReleaseMutex();
         }
     }
 }

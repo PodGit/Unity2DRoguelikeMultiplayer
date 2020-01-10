@@ -88,19 +88,9 @@ namespace Completed
 
                 return;
             }
-
-
+            
             //If it's not the player's turn, exit the function.
             if (GameManager.instance.playersTurn != playerId) return;
-			
-            //Get the current food point total stored in GameManager.instance between levels.
-            food = GameManager.instance.GetCurrentFoodPoints(playerId);
-
-            if (Local)
-            {
-                //Set the foodText to reflect the current player food total.
-                foodText.text = "Food: " + GameManager.instance.GetTotalCurrentFoodPoints();
-            }
 
 			int horizontal = 0;  	//Used to store the horizontal move direction.
 			int vertical = 0;       //Used to store the vertical move direction.
@@ -151,7 +141,7 @@ namespace Completed
 			{
 				vertical = 0;
 			}
-			//Check if we are running on iOS, Android, Windows Phone 8 or Unity iPhone
+            //Check if we are running on iOS, Android, Windows Phone 8 or Unity iPhone
 #elif UNITY_IOS || UNITY_ANDROID || UNITY_WP8 || UNITY_IPHONE
 			
 			//Check if Input has registered more than zero touches
@@ -193,9 +183,11 @@ namespace Completed
 			}
 			
 #endif //End of mobile platform dependendent compilation section started above with #elif
-			//Check if we have a non-zero value for horizontal or vertical
+            //Check if we have a non-zero value for horizontal or vertical
+            bool isNetworkClient = (NetworkManager.Instance.IsActive() &&
+                !NetworkManager.Instance.IsHost());
 
-            if (Local && NetworkManager.Instance.IsActive() && !NetworkManager.Instance.IsHost())
+            if (Local && isNetworkClient)
             {
                 if (horizontal != 0)
                 {
@@ -214,7 +206,7 @@ namespace Completed
                 horizontal = vertical = 0;
             }
 
-			if(horizontal != 0 || vertical != 0)
+			if(horizontal != 0 || vertical != 0 && !isNetworkClient)
 			{
 				//Call AttemptMove passing in the generic parameter Wall, since that is what Player may interact with if they encounter one (by attacking it)
 				//Pass in horizontal and vertical as parameters to specify the direction to move Player in.
@@ -226,14 +218,7 @@ namespace Completed
 		//AttemptMove takes a generic parameter T which for Player will be of the type Wall, it also takes integers for x and y direction to move in.
 		protected override void AttemptMove <T> (int xDir, int yDir)
 		{
-			//Every time player moves, subtract from food points total.
-			food--;
-
-            if (Local)
-            {
-                //Update food text display to reflect current score.
-                foodText.text = "Food: " + food;
-            }
+            UpdateFoodOnMove();			
 
 			//Call the AttemptMove method of the base class, passing in the component T (in this case Wall) and x and y direction to move.
 			base.AttemptMove <T> (xDir, yDir);
@@ -246,21 +231,40 @@ namespace Completed
 			{
                 PlayMovementSound();
 			}
-			
-			//Since the player has moved and lost food points, check if the game has ended.
-			CheckIfGameOver ();
 
-            //Set the playersTurn boolean of GameManager to false now that players turn is over.
-            GameManager.instance.PlayerMoved(playerId, xDir, yDir);			
+            //Since the player has moved and lost food points, check if the game has ended.
+            if (!NetworkManager.Instance.IsActive() ||
+                NetworkManager.Instance.IsHost())
+            {
+                CheckIfGameOver();
+
+                //Set the playersTurn boolean of GameManager to false now that players turn is over.
+                GameManager.instance.PlayerMoved(playerId, xDir, yDir);
+            }
 		}
+
+        void UpdateFoodOnMove()
+        {
+            //Every time player moves, subtract from food points total.
+            food--;
+
+            //Update food text display to reflect current score.
+            foodText.text = "Food: " + GameManager.instance.GetTotalCurrentFoodPoints();
+        }
 
         public void RemoteMove(int xDir, int yDir)
         {
+            AttemptMove<Wall>(xDir, yDir);
             RaycastHit2D hit;
             if (Move(xDir, yDir, out hit))
             {
                 PlayMovementSound();
             }
+        }
+
+        public int GetFood()
+        {
+            return food;
         }
 
         public void PlayMovementSound()
@@ -302,7 +306,7 @@ namespace Completed
 				food += pointsPerFood;
 				
 				//Update foodText to represent current total and notify player that they gained points
-				foodText.text = "+" + pointsPerFood + " Food: " + food;
+				foodText.text = "+" + pointsPerFood + " Food: " + GameManager.instance.GetTotalCurrentFoodPoints();
 				
 				//Call the RandomizeSfx function of SoundManager and pass in two eating sounds to choose between to play the eating sound effect.
 				SoundManager.instance.RandomizeSfx (eatSound1, eatSound2);
@@ -318,7 +322,7 @@ namespace Completed
 				food += pointsPerSoda;
 				
 				//Update foodText to represent current total and notify player that they gained points
-				foodText.text = "+" + pointsPerSoda + " Food: " + food;
+				foodText.text = "+" + pointsPerSoda + " Food: " + GameManager.instance.GetTotalCurrentFoodPoints();
 				
 				//Call the RandomizeSfx function of SoundManager and pass in two drinking sounds to choose between to play the drinking sound effect.
 				SoundManager.instance.RandomizeSfx (drinkSound1, drinkSound2);
@@ -349,7 +353,7 @@ namespace Completed
 			food -= loss;
 			
 			//Update the food display with the new total.
-			foodText.text = "-"+ loss + " Food: " + food;
+			foodText.text = "-"+ loss + " Food: " + GameManager.instance.GetTotalCurrentFoodPoints();
 			
 			//Check to see if game has ended.
 			CheckIfGameOver ();

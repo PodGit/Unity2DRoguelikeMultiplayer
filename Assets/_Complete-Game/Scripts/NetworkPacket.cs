@@ -22,7 +22,7 @@ public class NetworkPacket
         START_GAME,
         INIT_BOARD,
         MOVE_REQUEST,
-        PLAYER_STATES
+        PLAYER_MOVE
     }
 
     public enum DataType : byte

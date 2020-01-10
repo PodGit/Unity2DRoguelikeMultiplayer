@@ -343,10 +343,10 @@ namespace Completed
 
                         ReadPacketInitBoard(packet);                        
                         break;
-                    case NetworkPacket.PacketType.PLAYER_STATES:
+                    case NetworkPacket.PacketType.PLAYER_MOVE:
                         Debug.Assert(!IsHost(), "Only clients should recieve player states");
 
-                        ReadPacketPlayerStates(packet);
+                        ReadPacketPlayerMove(packet);
                         break;
                     default:
                         break;
@@ -397,21 +397,15 @@ namespace Completed
             GameManager.instance.SetClientReadyToStart(true);
         }
 
-        void ReadPacketPlayerStates(NetworkPacket packet)
+        void ReadPacketPlayerMove(NetworkPacket packet)
         {
-            int numPlayers = packet.ReadInt();
+            int playerId = packet.ReadInt();
 
-            Vector3[] playerPositions = new Vector3[numPlayers];
-            int[] playerFoodPoints = new int[numPlayers];
+            Vector3 move = new Vector3();
+            move.x = packet.ReadInt();
+            move.y = packet.ReadInt();
 
-            for (int playerIdx = 0; playerIdx < numPlayers; ++playerIdx)
-            {
-                playerPositions[playerIdx].x = packet.ReadInt();
-                playerPositions[playerIdx].y = packet.ReadInt();
-                playerFoodPoints[playerIdx] = packet.ReadInt();
-            }
-
-            GameManager.instance.RecievedPlayerStates(playerPositions, playerFoodPoints);
+            GameManager.instance.RecievedPlayerMove(playerId, move);
         }
 
         public void Join(string ipAddress, string playerName)
@@ -544,21 +538,16 @@ namespace Completed
             return gameStarted;
         }
 
-        public void BroadcastPlayerStates(Vector3[] playerPositions, int[] playerFoodPoints)
+        public void BroadcastPlayerMove(int playerId, Vector3 move)
         {
             Debug.Assert(IsHost(), "Only host should update player states");
-            Debug.Assert(playerPositions.Length <= playerFoodPoints.Length, "Only host should update player states");
 
             NetworkPacket packet = new NetworkPacket();
-            packet.SetPacketType(NetworkPacket.PacketType.PLAYER_STATES);
+            packet.SetPacketType(NetworkPacket.PacketType.PLAYER_MOVE);
 
-            packet.WriteInt(playerPositions.Length);
-            for (int playerIdx = 0; playerIdx < playerPositions.Length; ++playerIdx)
-            {
-                packet.WriteInt((int)playerPositions[playerIdx].x);
-                packet.WriteInt((int)playerPositions[playerIdx].y);
-                packet.WriteInt(playerFoodPoints[playerIdx]);
-            }
+            packet.WriteInt(playerId);
+            packet.WriteInt((int)move.x);
+            packet.WriteInt((int)move.y);
 
             BroadcastPacket(packet);
         }

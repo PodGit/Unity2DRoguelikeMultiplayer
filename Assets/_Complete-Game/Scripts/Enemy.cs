@@ -13,14 +13,15 @@ namespace Completed
 		
 		private Animator animator;							//Variable of type Animator to store a reference to the enemy's Animator component.
 		private Transform target;							//Transform to attempt to move toward each turn.
-		private bool skipMove;								//Boolean to determine whether or not enemy should skip a turn or move this turn.
-		
+		private bool skipMove;                              //Boolean to determine whether or not enemy should skip a turn or move this turn.
+        public int enemyId;
 		
 		//Start overrides the virtual Start function of the base class.
 		protected override void Start ()
 		{
-			//Register this enemy with our instance of GameManager by adding it to a list of Enemy objects. 
-			//This allows the GameManager to issue movement commands.
+            //Register this enemy with our instance of GameManager by adding it to a list of Enemy objects. 
+            //This allows the GameManager to issue movement commands.
+            enemyId = GameManager.instance.GetNumEnemies();
 			GameManager.instance.AddEnemyToList (this);
 			
 			//Get and store a reference to the attached Animator component.
@@ -52,10 +53,33 @@ namespace Completed
 			//Now that Enemy has moved, set skipMove to true to skip next move.
 			skipMove = true;
 		}
-		
-		
-		//MoveEnemy is called by the GameManger each turn to tell each Enemy to try to move towards the player.
-		public void MoveEnemy ()
+
+        public void UpdateTarget()
+        {
+            Player[] playerObjects = GameObject.FindObjectsOfType<Player>();
+
+            if (playerObjects.Length > 0)
+            {
+                Player closestPlayer = playerObjects[0];
+                float closestDistance = Vector3.Distance(transform.position, closestPlayer.transform.position);
+
+                for (int playerIdx = 1; playerIdx < playerObjects.Length; playerIdx++)
+                {
+                    float distance = Vector3.Distance(transform.position, playerObjects[playerIdx].transform.position);
+                    if (distance < closestDistance)
+                    {
+                        closestDistance = distance;
+                        closestPlayer = playerObjects[playerIdx];
+                    }
+                }
+
+                target = closestPlayer.transform;
+            }
+        }
+
+
+        //MoveEnemy is called by the GameManger each turn to tell each Enemy to try to move towards the player.
+        public void MoveEnemy ()
 		{
 			//Declare variables for X and Y axis move directions, these range from -1 to 1.
 			//These values allow us to choose between the cardinal directions: up, down, left and right.

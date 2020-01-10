@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+﻿    using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
 
@@ -26,7 +26,7 @@ namespace Completed
         private Text levelText;									//Text to display current level number.
 		private GameObject levelImage;							//Image to block out level as levels are being set up, background for levelText.
 		private BoardManager boardScript;						//Store a reference to our BoardManager which will set up the level.
-		private int level = 0;									//Current level number, expressed in game as "Day 1".
+		private int level = 2;									//Current level number, expressed in game as "Day 1".
 		private List<Enemy> enemies;							//List of all Enemy units, used to issue them move commands.
 		private bool enemiesMoving;								//Boolean to check if enemies are moving.
 		private bool doingSetup = true;                         //Boolean to check if we're setting up board, prevent Player from moving during setup.
@@ -85,7 +85,10 @@ namespace Completed
         //This is called each time a scene is loaded.
         static private void OnSceneLoaded(Scene arg0, LoadSceneMode arg1)
         {
-            if (arg0.name == "GameScene")
+            bool isNetworkClient = (NetworkManager.Instance.IsActive() &&
+                !NetworkManager.Instance.IsHost());
+
+            if (!isNetworkClient && arg0.name == "GameScene")
             {
                 instance.level++;
                 instance.InitGame();
@@ -133,10 +136,7 @@ namespace Completed
                 playerFoodPoints[playerIdx] = startFoodPoints;
             }
 
-            if (players == null)
-            {
-                SpawnPlayers();
-            }
+            SpawnPlayers();
         }
 
         void SpawnPlayers()
@@ -220,6 +220,10 @@ namespace Completed
 			enemies.Add(script);
 		}
 		
+        public int GetNumEnemies()
+        {
+            return enemies.Count;
+        }
 		
 		//GameOver is called when the player reaches 0 food points
 		public void GameOver()
@@ -253,6 +257,8 @@ namespace Completed
 			//Loop through List of Enemy objects.
 			for (int i = 0; i < enemies.Count; i++)
 			{
+                enemies[i].UpdateTarget();
+
 				//Call the MoveEnemy function of Enemy at index i in the enemies List.
 				enemies[i].MoveEnemy ();
 				

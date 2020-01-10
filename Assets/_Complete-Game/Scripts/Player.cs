@@ -74,11 +74,33 @@ namespace Completed
             //When Player object is disabled, store the current local food total in the GameManager so it can be re-loaded in next level.
             GameManager.instance.SetPlayerFoodPoints(playerId, food);
         }
-		
-		
-		private void Update ()
+
+        bool AllPlayersOnExitTiles()
+        {
+            //if (!NetworkManager.Instance.IsActive())
+            //{
+            //    return onExitTile;
+            //}
+            //else if (NetworkManager.Instance.IsHost())
+            //{
+
+            //}
+
+            Player[] players = GameObject.FindObjectsOfType<Player>();
+            for (int playerId = 0; playerId < players.Length; ++playerId)
+            {
+                if (!players[playerId].onExitTile)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void Update ()
 		{
-            if (onExitTile)
+            if (Local && AllPlayersOnExitTiles())
             {
                 //Invoke the Restart function to start the next level with a delay of restartLevelDelay (default 1 second).
                 Invoke("Restart", restartLevelDelay);
@@ -92,7 +114,15 @@ namespace Completed
             //If it's not the player's turn, exit the function.
             if (GameManager.instance.playersTurn != playerId) return;
 
-			int horizontal = 0;  	//Used to store the horizontal move direction.
+            bool isNetworkClient = (NetworkManager.Instance.IsActive() &&
+                !NetworkManager.Instance.IsHost());
+
+            // we as a client have already signaled our intentions for moving
+            if (isNetworkClient && 
+                NetworkManager.Instance.GetMyPeer().GetRequestedMovement() != MovementDirection.none)
+                return;
+
+            int horizontal = 0;  	//Used to store the horizontal move direction.
 			int vertical = 0;       //Used to store the vertical move direction.
 
             //Check if we are running either in the Unity editor or in a standalone build.
@@ -184,8 +214,6 @@ namespace Completed
 			
 #endif //End of mobile platform dependendent compilation section started above with #elif
             //Check if we have a non-zero value for horizontal or vertical
-            bool isNetworkClient = (NetworkManager.Instance.IsActive() &&
-                !NetworkManager.Instance.IsHost());
 
             if (Local && isNetworkClient)
             {
@@ -193,13 +221,11 @@ namespace Completed
                 {
                     MovementDirection direction = horizontal > 0 ?MovementDirection.right : MovementDirection.left;
                     NetworkManager.Instance.SetRequestedInput(direction);
-                    GameManager.instance.SetNextPlayersTurn();
                 }
                 else if (vertical != 0)
                 {
                     MovementDirection direction = vertical > 0 ? MovementDirection.up : MovementDirection.down;
                     NetworkManager.Instance.SetRequestedInput(direction);
-                    GameManager.instance.SetNextPlayersTurn();
                 }
 
                 // we're local but not host, clear inputs

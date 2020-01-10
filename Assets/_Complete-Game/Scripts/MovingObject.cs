@@ -61,6 +61,20 @@ namespace Completed
 			//If something was hit, return false, Move was unsuccesful.
 			return false;
 		}
+
+        public virtual void ForceMove(int xDir, int yDir)
+        {
+            //Store start position to move from, based on objects current transform position.
+            Vector2 start = transform.position;
+
+            // Calculate end position based on the direction parameters passed in when calling Move.
+            Vector2 end = start + new Vector2(xDir, yDir);
+
+            if (start != end)
+            {
+                StartCoroutine(SmoothMovement(end));
+            }
+        }
 		
 		
 		//Co-routine for moving units from one space to next, takes a parameter end to specify where to move to.

@@ -95,7 +95,7 @@ namespace Completed
 
         public Player.MovementDirection GetRequestedMovement()
         {
-            return Player.MovementDirection.none;
+            return requestedMovement;
         }
 
         public void SetRequestedMovement(Player.MovementDirection direction)

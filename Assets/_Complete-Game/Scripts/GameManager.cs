@@ -13,6 +13,7 @@ namespace Completed
 		public float turnDelay = 0.1f;							//Delay between each Player turn.
 		public static GameManager instance = null;				//Static instance of GameManager which allows it to be accessed by any other script.
 		[HideInInspector] public int playersTurn = 0;		    //Boolean to check if it's players turn, hidden in inspector but public.
+        public GameObject PlayerPrefab;
 
 
         private Text levelText;									//Text to display current level number.
@@ -22,14 +23,16 @@ namespace Completed
 		private List<Enemy> enemies;							//List of all Enemy units, used to issue them move commands.
 		private bool enemiesMoving;								//Boolean to check if enemies are moving.
 		private bool doingSetup = true;                         //Boolean to check if we're setting up board, prevent Player from moving during setup.
+        private GameObject[] players;
 
         //Network
         public const int MaxNumPlayers = 4;
         public int startFoodPoints = 100;
         public int numPlayers { get; set; } = 1;
         private int[] playerFoodPoints;
-        public GameObject PlayerPrefab;
         private bool clientReadyToStart = false;
+        private Vector3[] pendingPlayerPositions;
+        private int[] pendingFoodPositions;
 
         //Awake is always called before any Start functions
         void Awake()
@@ -84,6 +87,7 @@ namespace Completed
             {
                 numPlayers = NetworkManager.Instance.GetNumPeers();
             }
+            else numPlayers = 1;
 
 			//While doingSetup is true the player can't move, prevent player from moving while title card is up.
 			doingSetup = true;
@@ -115,21 +119,34 @@ namespace Completed
                 playerFoodPoints[playerIdx] = startFoodPoints;
             }
 
-            SpawnExtraPlayers();
+            if (players == null)
+            {
+                SpawnPlayers();
+            }
         }
 
-        void SpawnExtraPlayers()
+        void SpawnPlayers()
         {
-            for (int playerIdx = 1; playerIdx < numPlayers; ++playerIdx)
+            bool networkActive = NetworkManager.Instance.IsActive();
+
+            players = new GameObject[numPlayers];
+
+            for (int playerIdx = 0; playerIdx < numPlayers; ++playerIdx)
             {
                 Debug.Assert(PlayerPrefab != null, "Player prefab not set");
 
                 Vector3 spawnVector = new Vector3(playerIdx, 0, 0);
-                GameObject spawnedObject = Instantiate(PlayerPrefab, spawnVector, Quaternion.identity);
-                Player spawnedPlayer = spawnedObject.GetComponent<Player>();
+                players[playerIdx] = Instantiate(PlayerPrefab, spawnVector, Quaternion.identity);
+                Player spawnedPlayer = players[playerIdx].GetComponent<Player>();
 
-                spawnedPlayer.Local = false;
                 spawnedPlayer.playerId = playerIdx;
+                spawnedPlayer.Local = true;
+
+                if (networkActive &&
+                    NetworkManager.Instance.GetMyPeer().GetPeerId() != playerIdx)
+                {
+                    spawnedPlayer.Local = false;
+                }
             }
         }
 
@@ -150,6 +167,15 @@ namespace Completed
             {
                 InitGame();
                 clientReadyToStart = false;
+            }
+
+            if (pendingPlayerPositions != null)
+            {
+                UpdatePlayerPositions();
+
+                SetNextPlayersTurn();
+                pendingPlayerPositions = null;
+                pendingFoodPositions = null;
             }
 
 			//Check that playersTurn or enemiesMoving or doingSetup are not currently true.
@@ -215,7 +241,7 @@ namespace Completed
 			enemiesMoving = false;
 		}
 
-        public int GetCurrentFoodPoints()
+        public int GetTotalCurrentFoodPoints()
         {
             int currentPoints = 0;
 
@@ -227,12 +253,40 @@ namespace Completed
             return currentPoints;
         }
 
+        public int GetCurrentFoodPoints(int playerId)
+        {
+            return playerFoodPoints[playerId];
+        }
+
         public void SetPlayerFoodPoints(int playerId, int food)
         {
             playerFoodPoints[playerId] = food;
         }
 
-        public void PlayerMoved(int playerId)
+        public void PlayerMoved(int playerId, int xDir, int yDir)
+        {
+            SetNextPlayersTurn();
+
+            if (NetworkManager.Instance.IsActive() && NetworkManager.Instance.IsHost())
+            {
+                Vector3[] playerPositions = new Vector3[numPlayers];
+                for (int playerIdx = 0; playerIdx < numPlayers; ++playerIdx)
+                {
+                    Vector3 newPosition = players[playerIdx].transform.position;
+                    if (playerId == playerIdx)
+                    {
+                        newPosition.x += xDir;
+                        newPosition.y += yDir;
+                    }
+                    playerPositions[playerIdx] = newPosition;
+                    
+                }
+
+                NetworkManager.Instance.BroadcastPlayerStates(playerPositions, playerFoodPoints);
+            }
+        }
+
+        public void SetNextPlayersTurn()
         {
             playersTurn++;
 
@@ -241,11 +295,6 @@ namespace Completed
             {
                 playersTurn = -1;
             }
-
-            //if (NetworkManager.Instance.IsActive() && NetworkManager.Instance.IsHost())
-            //{
-            //    BroadcastGameState();
-            //}
         }
 
         public BoardManager GetBoardManager()
@@ -261,6 +310,34 @@ namespace Completed
         public void SetClientReadyToStart(bool ready)
         {
             clientReadyToStart = ready;
+        }
+
+        public void RecievedPlayerStates(Vector3[] playerPositions, int[] playerFoodPoints)
+        {
+            pendingPlayerPositions = playerPositions;
+            pendingFoodPositions = playerFoodPoints;
+        }
+
+        void UpdatePlayerPositions()
+        {
+            for (int playerIdx = 0; playerIdx < pendingPlayerPositions.Length; ++playerIdx)
+            {
+                playerFoodPoints[playerIdx] = pendingFoodPositions[playerIdx];
+                int newX = (int)pendingPlayerPositions[playerIdx].x;
+                int newY = (int)pendingPlayerPositions[playerIdx].y;
+
+                GameObject playerObject = players[playerIdx];
+                Player player = playerObject.GetComponent<Player>();
+
+                if (NetworkManager.Instance.IsActive())
+                {
+                    NetworkPeer peer = NetworkManager.Instance.GetPeer(playerIdx);
+                    peer.SetRequestedMovement(Player.MovementDirection.none);
+                }
+
+                Vector3 position = player.transform.position;
+                player.RemoteMove(newX - (int)position.x, newY - (int)position.y);
+            }
         }
     }
 }

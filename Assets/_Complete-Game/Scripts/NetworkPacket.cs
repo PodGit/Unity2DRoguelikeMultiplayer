@@ -21,7 +21,8 @@ public class NetworkPacket
         INIT_PEER_DATA,
         START_GAME,
         INIT_BOARD,
-        MOVE_REQUEST
+        MOVE_REQUEST,
+        PLAYER_STATES
     }
 
     public enum DataType : byte

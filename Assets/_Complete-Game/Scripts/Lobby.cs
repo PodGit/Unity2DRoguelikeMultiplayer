@@ -107,7 +107,7 @@ namespace Completed
 
         public void StartGamePressed()
         {
-            NetworkManager.Instance.StartGame();
+            NetworkManager.Instance.BroadcastLoadToGame();
             StartGame();
         }
 

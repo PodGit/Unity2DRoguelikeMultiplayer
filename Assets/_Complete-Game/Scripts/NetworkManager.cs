@@ -343,6 +343,11 @@ namespace Completed
 
                         ReadPacketInitBoard(packet);                        
                         break;
+                    case NetworkPacket.PacketType.PLAYER_STATES:
+                        Debug.Assert(!IsHost(), "Only clients should recieve player states");
+
+                        ReadPacketPlayerStates(packet);
+                        break;
                     default:
                         break;
                 }
@@ -390,6 +395,23 @@ namespace Completed
             GameManager.instance.GetBoardManager().InitBoard(wallTilePositions, foodTilePositions, enemyTilePositions);
             GameManager.instance.SetLevel(level);
             GameManager.instance.SetClientReadyToStart(true);
+        }
+
+        void ReadPacketPlayerStates(NetworkPacket packet)
+        {
+            int numPlayers = packet.ReadInt();
+
+            Vector3[] playerPositions = new Vector3[numPlayers];
+            int[] playerFoodPoints = new int[numPlayers];
+
+            for (int playerIdx = 0; playerIdx < numPlayers; ++playerIdx)
+            {
+                playerPositions[playerIdx].x = packet.ReadInt();
+                playerPositions[playerIdx].y = packet.ReadInt();
+                playerFoodPoints[playerIdx] = packet.ReadInt();
+            }
+
+            GameManager.instance.RecievedPlayerStates(playerPositions, playerFoodPoints);
         }
 
         public void Join(string ipAddress, string playerName)
@@ -473,14 +495,14 @@ namespace Completed
             SendPacketToPeer(joinPacket, toPeer);
         }
 
-        void SendStartGamePacket(NetworkPeer toPeer)
+        public void BroadcastLoadToGame()
         {
-            NetworkPeer myPeer = GetMyPeer();
+            Debug.Assert(IsHost(), "Can't call start game as non-host");
 
             NetworkPacket startPacket = new NetworkPacket();
             startPacket.SetPacketType(NetworkPacket.PacketType.START_GAME);
 
-            SendPacketToPeer(startPacket, toPeer);
+            BroadcastPacket(startPacket);
         }
 
         public void SetRequestedInput(Player.MovementDirection direction)
@@ -517,40 +539,28 @@ namespace Completed
             writeQueueMutex.ReleaseMutex();
         }
 
-        public void StartGame()
-        {
-            Debug.Assert(IsHost(), "Can't call start game as non-host");
-
-            for (int peerIdx = 0; peerIdx < numPeers; peerIdx++)
-            {
-                NetworkPeer peer = GetPeer(peerIdx);
-                if (peer != null && !peer.IsLocal())
-                {
-                    SendStartGamePacket(peer);
-                }
-            }
-        }
-
         public bool GetGameStarted()
         {
             return gameStarted;
         }
 
-        public void BroadcastBoardPositions()
+        public void BroadcastPlayerStates(Vector3[] playerPositions, int[] playerFoodPoints)
         {
+            Debug.Assert(IsHost(), "Only host should update player states");
+            Debug.Assert(playerPositions.Length <= playerFoodPoints.Length, "Only host should update player states");
 
-        }
+            NetworkPacket packet = new NetworkPacket();
+            packet.SetPacketType(NetworkPacket.PacketType.PLAYER_STATES);
 
-        public void BroadcastGameState()
-        {
-            Debug.Assert(IsHost(), "Only host should update gamestate");
-        }
+            packet.WriteInt(playerPositions.Length);
+            for (int playerIdx = 0; playerIdx < playerPositions.Length; ++playerIdx)
+            {
+                packet.WriteInt((int)playerPositions[playerIdx].x);
+                packet.WriteInt((int)playerPositions[playerIdx].y);
+                packet.WriteInt(playerFoodPoints[playerIdx]);
+            }
 
-        public void BroadcastWallTiles(GameObject[] wallTiles)
-        {
-            Debug.Assert(IsHost(), "Only host can broadcast board pieces");
-
-
+            BroadcastPacket(packet);
         }
 
         public void BroadcastRoundStart(int level, BoardManager.PlacedObject[] wallTiles, BoardManager.PlacedObject[] foodTiles, BoardManager.PlacedObject[] enemyTiles)
@@ -594,6 +604,13 @@ namespace Completed
                 Debug.Log("Enemy tile[" + enemyTileIndex + "]: LocationIdnex: " + enemyTiles[enemyTileIndex].locationIndex + "  tileIndex: " + enemyTiles[enemyTileIndex].tileIndex);
             }
 
+            BroadcastPacket(packet);
+        }
+
+        void BroadcastPacket(NetworkPacket packet)
+        {
+            Debug.Assert(IsHost(), "Only session host can broadcast packets");
+
             for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
             {
                 NetworkPeer peer = GetPeer(peerIdx);
@@ -605,12 +622,7 @@ namespace Completed
             }
         }
 
-        public void BroadcastFoodTiles(GameObject[] foodTiles)
-        {
-            Debug.Assert(IsHost(), "Only host can broadcast board pieces");
-        }
-
-        NetworkPeer GetMyPeer()
+        public NetworkPeer GetMyPeer()
         {
             for (int peerIdx = 0; peerIdx < numPeers; ++peerIdx)
             {

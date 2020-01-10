@@ -11,8 +11,10 @@ namespace Completed
         public enum MovementDirection
         {
             none,
-            horizontal,
-            vertical
+            up,
+            down,
+            left,
+            right
         }
 
 		public float restartLevelDelay = 1f;		//Delay time in seconds to restart level.
@@ -45,12 +47,18 @@ namespace Completed
 			//Get a component reference to the Player's animator component
 			animator = GetComponent<Animator>();
 
-            if (Local)
+            if (foodText == null)
             {
-                //Get the current food point total stored in GameManager.instance between levels.
-                food = GameManager.instance.GetCurrentFoodPoints();
+                foodText = GameObject.Find("FoodText").GetComponent<UnityEngine.UI.Text>();
+            }
+
+            //Get the current food point total stored in GameManager.instance between levels.
+            food = GameManager.instance.GetCurrentFoodPoints(playerId);
+            
+            if (Local)
+            { 
                 //Set the foodText to reflect the current player food total.
-                foodText.text = "Food: " + food;
+                foodText.text = "Food: " + GameManager.instance.GetTotalCurrentFoodPoints();
             }
 
             onExitTile = false;
@@ -72,7 +80,6 @@ namespace Completed
 		{
             if (onExitTile)
             {
-                Debug.Assert(false, "awdawdaw");
                 //Invoke the Restart function to start the next level with a delay of restartLevelDelay (default 1 second).
                 Invoke("Restart", restartLevelDelay);
 
@@ -82,9 +89,19 @@ namespace Completed
                 return;
             }
 
+
             //If it's not the player's turn, exit the function.
             if (GameManager.instance.playersTurn != playerId) return;
 			
+            //Get the current food point total stored in GameManager.instance between levels.
+            food = GameManager.instance.GetCurrentFoodPoints(playerId);
+
+            if (Local)
+            {
+                //Set the foodText to reflect the current player food total.
+                foodText.text = "Food: " + GameManager.instance.GetTotalCurrentFoodPoints();
+            }
+
 			int horizontal = 0;  	//Used to store the horizontal move direction.
 			int vertical = 0;       //Used to store the vertical move direction.
 
@@ -104,14 +121,23 @@ namespace Completed
                 NetworkPeer peer = NetworkManager.Instance.GetPeer(playerId);
                 MovementDirection requestedDirection = peer.GetRequestedMovement();
 
-                if (requestedDirection == MovementDirection.horizontal)
+                switch(requestedDirection)
                 {
-                    horizontal = 1;
+                    case MovementDirection.up:
+                        vertical = 1;
+                        break;
+                    case MovementDirection.down:
+                        vertical = -1;
+                        break;
+                    case MovementDirection.left:
+                        horizontal = -1;
+                        break;
+                    case MovementDirection.right:
+                        horizontal = 1;
+                        break;
+                    default:
+                        break;
                 }
-                else if (requestedDirection == MovementDirection.vertical)
-                {
-                    vertical = 1;
-                } 
                 
                 // we read the requested mvoement now reset it
                 if (requestedDirection != MovementDirection.none)
@@ -173,11 +199,15 @@ namespace Completed
             {
                 if (horizontal != 0)
                 {
-                    NetworkManager.Instance.SetRequestedInput(MovementDirection.horizontal);
+                    MovementDirection direction = horizontal > 0 ?MovementDirection.right : MovementDirection.left;
+                    NetworkManager.Instance.SetRequestedInput(direction);
+                    GameManager.instance.SetNextPlayersTurn();
                 }
                 else if (vertical != 0)
                 {
-                    NetworkManager.Instance.SetRequestedInput(MovementDirection.vertical);
+                    MovementDirection direction = vertical > 0 ? MovementDirection.up : MovementDirection.down;
+                    NetworkManager.Instance.SetRequestedInput(direction);
+                    GameManager.instance.SetNextPlayersTurn();
                 }
 
                 // we're local but not host, clear inputs
@@ -210,21 +240,34 @@ namespace Completed
 			
 			//Hit allows us to reference the result of the Linecast done in Move.
 			RaycastHit2D hit;
-			
-			//If Move returns true, meaning Player was able to move into an empty space.
-			if (Move (xDir, yDir, out hit)) 
+
+            //If Move returns true, meaning Player was able to move into an empty space.
+            if (Move(xDir, yDir, out hit))
 			{
-				//Call RandomizeSfx of SoundManager to play the move sound, passing in two audio clips to choose from.
-				SoundManager.instance.RandomizeSfx (moveSound1, moveSound2);
+                PlayMovementSound();
 			}
 			
 			//Since the player has moved and lost food points, check if the game has ended.
 			CheckIfGameOver ();
 
             //Set the playersTurn boolean of GameManager to false now that players turn is over.
-            GameManager.instance.PlayerMoved(playerId);			
+            GameManager.instance.PlayerMoved(playerId, xDir, yDir);			
 		}
-		
+
+        public void RemoteMove(int xDir, int yDir)
+        {
+            RaycastHit2D hit;
+            if (Move(xDir, yDir, out hit))
+            {
+                PlayMovementSound();
+            }
+        }
+
+        public void PlayMovementSound()
+        {
+            //Call RandomizeSfx of SoundManager to play the move sound, passing in two audio clips to choose from.
+            SoundManager.instance.RandomizeSfx(moveSound1, moveSound2);
+        }		
 		
 		//OnCantMove overrides the abstract function OnCantMove in MovingObject.
 		//It takes a generic parameter T which in the case of Player is a Wall which the player can attack and destroy.
